@@ -1,0 +1,121 @@
+/* NexCore 统一 UI 设计 token —— 全局 :root 注入 */
+
+:root {
+  /* === 字体(反 AI 味第 1 条:双字体 + mono) === */
+  --font-display: 'Manrope', 'Satoshi', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Menlo, monospace;
+
+  /* === 主色 === */
+  --nc-primary: #3b82f6;
+  --nc-primary-deep: #2563eb;
+  --nc-primary-soft: #eff6ff;
+  --nc-primary-soft2: #dbeafe;
+  --nc-primary-border: #bfdbfe;
+
+  /* === 中性色 === */
+  --nc-bg: #f8fafc;
+  --nc-card: #ffffff;
+  --nc-text-1: #0f172a;
+  --nc-text-2: #1e293b;
+  --nc-text-3: #334155;
+  --nc-text-muted: #64748b;
+  --nc-text-faint: #94a3b8;
+  --nc-border: #e2e8f0;
+  --nc-border-soft: #f1f5f9;
+  --nc-border-strong: #cbd5e1;
+
+  /* === 语义色 === */
+  --nc-success: #16a34a;
+  --nc-success-soft: #dcfce7;
+  --nc-warning: #d97706;
+  --nc-warning-soft: #fef3c7;
+  --nc-danger: #dc2626;
+  --nc-danger-soft: #fee2e2;
+  --nc-info: #0ea5e9;
+
+  /* === 间距节奏(反 AI 味第 3 条:不要全 20px) === */
+  --space-section: 32px;
+  --space-card: 24px;
+  --space-field: 16px;
+  --space-inline: 12px;
+  --space-tight: 8px;
+  --space-hair: 4px;
+
+  /* === 圆角 === */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* === 阴影 === */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --shadow-blue: 0 4px 12px rgba(59, 130, 246, 0.12);
+
+  /* === 动效 === */
+  --t-fast: 0.12s ease-out;
+  --t-base: 0.18s ease-out;
+  --t-slow: 0.28s ease-out;
+
+  /* === 布局 === */
+  --shell-aside-w: 232px;
+  --shell-aside-w-collapsed: 64px;
+  --shell-header-h: 60px;
+  --page-max-w: 1280px;
+
+  /* === Element Plus token 覆盖(主色) === */
+  --el-color-primary: var(--nc-primary);
+  --el-color-primary-light-3: #60a5fa;
+  --el-color-primary-light-5: #93c5fd;
+  --el-color-primary-light-7: #bfdbfe;
+  --el-color-primary-light-8: #dbeafe;
+  --el-color-primary-light-9: #eff6ff;
+  --el-color-primary-dark-2: var(--nc-primary-deep);
+  --el-border-color: var(--nc-border);
+  --el-border-color-lighter: var(--nc-border-soft);
+  --el-fill-color-blank: #ffffff;
+  --el-bg-color-page: var(--nc-bg);
+  --el-text-color-primary: var(--nc-text-1);
+  --el-text-color-regular: var(--nc-text-3);
+  --el-text-color-secondary: var(--nc-text-muted);
+  --el-text-color-placeholder: var(--nc-text-faint);
+  --el-font-size-base: 13px;
+  --el-border-radius-base: var(--radius-md);
+}
+
+/* 全局 reset */
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--nc-text-2);
+  background: var(--nc-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.page-title, .card-title, .section-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+code, kbd, samp, pre, .mono, .address, .tx-hash, .amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--nc-primary);
+  text-decoration: none;
+  transition: color var(--t-fast);
+}
+a:hover { color: var(--nc-primary-deep); }

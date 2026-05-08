@@ -1,0 +1,61 @@
+/* el-dialog 高度硬约束 ≤ 66vh
+ *  必须放在全局非 scoped 样式,因为 el-dialog 走 Teleport 挂到 body 下,scoped style 永远写不进。
+ *  使用方式:<el-dialog class="constrained-dialog">
+ */
+
+.el-overlay-dialog .el-dialog.constrained-dialog {
+  max-height: 66vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 12px;
+  width: min(640px, 92vw);
+}
+
+.el-overlay-dialog .el-dialog.constrained-dialog .el-dialog__header {
+  flex: 0 0 auto;
+  padding: 16px 20px;
+  margin: 0;
+  border-bottom: 1px solid var(--nc-border);
+}
+
+.el-overlay-dialog .el-dialog.constrained-dialog .el-dialog__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--nc-text-1);
+  font-family: var(--font-display);
+}
+
+.el-overlay-dialog .el-dialog.constrained-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;            /* ⚠️ 关键:flex item 默认 min-height:auto 不允许 shrink,缺这行 overflow 永远不触发 */
+  padding: 16px 20px;
+  font-size: 13px;
+  color: var(--nc-text-3);
+}
+
+.el-overlay-dialog .el-dialog.constrained-dialog .el-dialog__footer {
+  flex: 0 0 auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--nc-border);
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .el-overlay-dialog .el-dialog.constrained-dialog {
+    max-height: 80vh;
+    width: 92vw !important;
+    border-radius: 10px;
+  }
+}
+
+/* 大型 dialog 变体(宽一点,高度依旧 66vh 限) */
+.el-overlay-dialog .el-dialog.constrained-dialog.is-wide {
+  width: min(960px, 94vw);
+}
+
+.el-overlay-dialog .el-dialog.constrained-dialog.is-medium {
+  width: min(800px, 92vw);
+}

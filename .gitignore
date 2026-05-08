@@ -1,0 +1,36 @@
+.DS_Store
+dist/
+release/
+backup/
+bin/
+db/
+sui
+web/html
+main
+tmp
+.sync*
+*.tar.gz
+frontend/node_modules/
+frontend/dist/
+frontend/auto-imports.d.ts
+frontend/components.d.ts
+
+# local env files
+.env.local
+.env.*.local
+
+# Log files
+*.log*
+.cache
+
+# Windows build artifacts
+*.exe
+*.zip
+s-ui-windows/
+sui-*.exe
+sui-*.zip
+windows/sui-*.exe
+
+# Editor directories and files
+.idea
+.vscode

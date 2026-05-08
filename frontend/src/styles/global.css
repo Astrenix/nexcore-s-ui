@@ -1,0 +1,302 @@
+/* NexCore 全局样式接管(body.app-admin 命名空间) === */
+
+body.app-admin {
+  /* === 页面容器 Rhythm Lock === */
+}
+
+body.app-admin .page-container {
+  max-width: var(--page-max-w);
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  body.app-admin .page-container {
+    padding: 16px 12px 24px;
+    gap: 12px;
+  }
+}
+
+/* === 页面标题区(必遵:垂直堆叠) === */
+body.app-admin .page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.app-admin .page-header.with-actions {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+body.app-admin .page-header.with-actions .page-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+body.app-admin .page-header.with-actions .page-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+body.app-admin .page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--nc-text-1);
+  line-height: 1.4;
+}
+
+body.app-admin .page-desc {
+  font-size: 13px;
+  color: var(--nc-text-muted);
+  line-height: 1.55;
+  max-width: 720px;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  body.app-admin .page-title { font-size: 16px; }
+  body.app-admin .page-desc { font-size: 12px; }
+  body.app-admin .page-header.with-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.app-admin .page-header.with-actions .page-header-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* === 卡片(用 div 不用 el-card) === */
+body.app-admin .nc-card {
+  background: var(--nc-card);
+  border: 1px solid var(--nc-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 20px;
+  transition: border-color var(--t-base), box-shadow var(--t-base);
+}
+
+body.app-admin .nc-card:hover {
+  border-color: var(--nc-primary-border);
+  box-shadow: var(--shadow-md);
+}
+
+body.app-admin .nc-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nc-text-1);
+  margin: 0 0 12px;
+}
+
+/* === Stat-card(顶色条 + Rhythm Lock,反 AI 味禁用 el-card) === */
+body.app-admin .stat-card {
+  position: relative;
+  background: var(--nc-card);
+  border: 1px solid var(--nc-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  --nc-accent: var(--nc-primary);
+}
+body.app-admin .stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--nc-accent);
+}
+body.app-admin .stat-card.success { --nc-accent: var(--nc-success); }
+body.app-admin .stat-card.warning { --nc-accent: var(--nc-warning); }
+body.app-admin .stat-card.danger { --nc-accent: var(--nc-danger); }
+body.app-admin .stat-card.info { --nc-accent: var(--nc-info); }
+
+body.app-admin .stat-card .stat-label {
+  font-size: 12px;
+  color: var(--nc-text-muted);
+  font-weight: 500;
+}
+body.app-admin .stat-card .stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--nc-text-1);
+  line-height: 1.15;
+}
+body.app-admin .stat-card .stat-meta {
+  font-size: 11.5px;
+  color: var(--nc-text-faint);
+}
+
+/* === Element Plus 主按钮覆盖(必须排除 plain/link/text 变体) === */
+body.app-admin .el-button--primary:not(.is-plain):not(.is-link):not(.is-text):not(.is-disabled) {
+  background-color: var(--nc-primary);
+  border-color: var(--nc-primary);
+  color: #ffffff;
+}
+body.app-admin .el-button--primary:not(.is-plain):not(.is-link):not(.is-text):not(.is-disabled):hover {
+  background-color: var(--nc-primary-deep);
+  border-color: var(--nc-primary-deep);
+}
+
+body.app-admin .el-button {
+  font-weight: 500;
+}
+
+/* === Element Plus 表格 === */
+body.app-admin .el-table th.el-table__cell {
+  background: #f8fafc;
+  color: var(--nc-text-2);
+  font-weight: 600;
+  font-size: 12.5px;
+  height: 40px;
+}
+body.app-admin .el-table tr:hover > td.el-table__cell {
+  background: var(--nc-border-soft) !important;
+}
+body.app-admin .el-table .cell {
+  font-size: 13px;
+  line-height: 1.5;
+}
+body.app-admin .el-table td.el-table__cell {
+  padding: 10px 0;
+}
+body.app-admin .el-table .amount-cell,
+body.app-admin .el-table .number-cell {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+body.app-admin .el-table .el-table__fixed,
+body.app-admin .el-table .el-table__fixed-right {
+  background-color: #fff;
+}
+
+/* === Element Plus Tag(不一刀切 border:none) === */
+body.app-admin .el-tag {
+  font-size: 11.5px;
+  padding: 0 8px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+}
+
+/* === Element Plus Form 紧凑档 === */
+body.app-admin .el-form-item {
+  margin-bottom: 14px;
+}
+body.app-admin .el-form-item__label {
+  font-size: 13px;
+  color: var(--nc-text-3);
+  font-weight: 500;
+  padding-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* === Element Plus Switch 紧凑(18px) === */
+body.app-admin .el-switch {
+  --el-switch-core-height: 18px;
+  --el-switch-core-min-width: 34px;
+}
+
+/* === Element Plus Input 圆角 === */
+body.app-admin .el-input__wrapper {
+  border-radius: var(--radius-md);
+}
+
+/* === Element Plus Tabs 统一样式 === */
+body.app-admin .nc-tabs {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--nc-border);
+  overflow: hidden;
+}
+body.app-admin .nc-tabs .el-tabs__header {
+  margin: 0;
+  padding: 0 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--nc-border);
+}
+body.app-admin .nc-tabs .el-tabs__nav-wrap::after {
+  display: none;
+}
+body.app-admin .nc-tabs .el-tabs__item {
+  height: 44px;
+  font-size: 13px;
+  color: var(--nc-text-muted);
+  padding: 0 16px;
+}
+body.app-admin .nc-tabs .el-tabs__item.is-active {
+  color: var(--nc-primary);
+  font-weight: 600;
+}
+body.app-admin .nc-tabs .el-tabs__active-bar {
+  background-color: var(--nc-primary);
+  height: 2px;
+}
+body.app-admin .nc-tabs .el-tabs__content {
+  padding: 20px;
+}
+
+/* === Element Plus Pagination === */
+body.app-admin .el-pagination {
+  --el-pagination-button-color: var(--nc-text-3);
+  --el-pagination-hover-color: var(--nc-primary);
+  font-weight: 500;
+}
+
+/* === 分组分隔(Linear/Notion 风格,左对齐 uppercase) === */
+body.app-admin .nc-divider {
+  padding: 14px 12px 6px;
+}
+body.app-admin .nc-divider span {
+  font-size: 10.5px;
+  color: var(--nc-text-faint);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* === 状态点(状态用圆点 + 文字,不用大块底色) === */
+body.app-admin .status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+body.app-admin .status-dot.online { background: var(--nc-success); }
+body.app-admin .status-dot.offline { background: var(--nc-text-faint); }
+body.app-admin .status-dot.warning { background: var(--nc-warning); }
+body.app-admin .status-dot.error { background: var(--nc-danger); }
+
+/* === 滚动条美化 === */
+body.app-admin ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+body.app-admin ::-webkit-scrollbar-thumb {
+  background: var(--nc-border-strong);
+  border-radius: 999px;
+}
+body.app-admin ::-webkit-scrollbar-thumb:hover {
+  background: var(--nc-text-faint);
+}
+body.app-admin ::-webkit-scrollbar-track {
+  background: transparent;
+}
