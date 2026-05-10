@@ -44,43 +44,65 @@ func GetLogger() *logging.Logger {
 	return logger
 }
 
+// CLI 路径(sui admin / setting / token / migrate)不调 InitLogger,所以这些
+// 函数被调用时 logger 可能是 nil。每个函数都检查一下,避免 nil-deref panic。
+// 之前 database.initUser 加 logger.Info 打印初始凭据,在 sui admin
+// -username/-password 路径触发,sui CLI 直接 panic — 用户报"写入 admin
+// 凭据失败"实际是 panic 栈被 install.sh 吞掉的副作用。
+
 func Debug(args ...interface{}) {
-	logger.Debug(args...)
+	if logger != nil {
+		logger.Debug(args...)
+	}
 	addToBuffer("DEBUG", fmt.Sprint(args...))
 }
 
 func Debugf(format string, args ...interface{}) {
-	logger.Debugf(format, args...)
+	if logger != nil {
+		logger.Debugf(format, args...)
+	}
 	addToBuffer("DEBUG", fmt.Sprintf(format, args...))
 }
 
 func Info(args ...interface{}) {
-	logger.Info(args...)
+	if logger != nil {
+		logger.Info(args...)
+	}
 	addToBuffer("INFO", fmt.Sprint(args...))
 }
 
 func Infof(format string, args ...interface{}) {
-	logger.Infof(format, args...)
+	if logger != nil {
+		logger.Infof(format, args...)
+	}
 	addToBuffer("INFO", fmt.Sprintf(format, args...))
 }
 
 func Warning(args ...interface{}) {
-	logger.Warning(args...)
+	if logger != nil {
+		logger.Warning(args...)
+	}
 	addToBuffer("WARNING", fmt.Sprint(args...))
 }
 
 func Warningf(format string, args ...interface{}) {
-	logger.Warningf(format, args...)
+	if logger != nil {
+		logger.Warningf(format, args...)
+	}
 	addToBuffer("WARNING", fmt.Sprintf(format, args...))
 }
 
 func Error(args ...interface{}) {
-	logger.Error(args...)
+	if logger != nil {
+		logger.Error(args...)
+	}
 	addToBuffer("ERROR", fmt.Sprint(args...))
 }
 
 func Errorf(format string, args ...interface{}) {
-	logger.Errorf(format, args...)
+	if logger != nil {
+		logger.Errorf(format, args...)
+	}
 	addToBuffer("ERROR", fmt.Sprintf(format, args...))
 }
 

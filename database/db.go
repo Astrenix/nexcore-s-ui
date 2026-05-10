@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/alireza0/s-ui/config"
 	"github.com/alireza0/s-ui/database/model"
-	logr "github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/util/common"
 
 	"golang.org/x/crypto/bcrypt"
@@ -50,13 +50,15 @@ func initUser() error {
 	if err := db.Create(user).Error; err != nil {
 		return err
 	}
-	// 顶头高亮:启动日志一次性打印初始凭据。运维错过这次就只能 `sui admin -username admin -password XXX` 重置。
-	logr.Info("================================================================")
-	logr.Info("  首次启动 — 管理员初始凭据(本次启动只显示一次,务必抄走!)")
-	logr.Info("    username : admin")
-	logr.Info("    password : ", plain)
-	logr.Info("  改密码:登录面板「设置 → 修改密码」 或 CLI `sui admin -username admin -password 新密码`")
-	logr.Info("================================================================")
+	// 直接写 stderr — InitDB 可能从 panel(已 InitLogger)或 CLI(logger=nil
+	// 会 panic)路径调用。stderr 在两种路径都能落到 systemd journal / install.sh
+	// stdout,可靠性高于 logger 全局状态。运维错过这次就只能 `sui admin -reset` 重置。
+	fmt.Fprintln(os.Stderr, "================================================================")
+	fmt.Fprintln(os.Stderr, "  首次启动 — 管理员初始凭据(本次启动只显示一次,务必抄走!)")
+	fmt.Fprintln(os.Stderr, "    username : admin")
+	fmt.Fprintln(os.Stderr, "    password : "+plain)
+	fmt.Fprintln(os.Stderr, "  改密码:登录面板「设置 → 修改密码」 或 CLI `sui admin -reset`")
+	fmt.Fprintln(os.Stderr, "================================================================")
 	return nil
 }
 
