@@ -17,6 +17,81 @@ import (
 
 type ClientService struct{}
 
+// linkRemarkCtx 给 LinkGenerator 拼 remark 用的 ctx,一次拉好避免每个
+// inbound × client 重复查 settings / outbounds / route.rules。
+type linkRemarkCtx struct {
+	NodeName       string            // 设置里的节点名称(直连模式 prefix)
+	InboundRelay   map[string]string // inboundTag → outboundTag(中转关系,_nb_binding 标记)
+	OutboundDisplay map[string]string // outboundTag → DisplayName(空 fallback tag)
+}
+
+// remarkPrefixFor 决定 inbound 的 remark 前缀:
+//
+//	中转(InboundRelay 命中且非 'direct')→ outboundDisplay[ot] 优先,空则 outboundTag
+//	直连 / 未配中转           → nodeName(空则空字符串,LinkGenerator 内部 fallback inbound.Tag)
+func (c *linkRemarkCtx) remarkPrefixFor(inboundTag string) string {
+	if ot, ok := c.InboundRelay[inboundTag]; ok && ot != "" {
+		if dn := c.OutboundDisplay[ot]; dn != "" {
+			return dn
+		}
+		return ot
+	}
+	return c.NodeName
+}
+
+// buildLinkRemarkCtx 把 settings.nodeName + outbounds.display_name + route.rules
+// 里的 _nb_binding 中转关系打包成 ctx。任何一项失败都用空 map 兜底,不阻断 link 生成。
+func buildLinkRemarkCtx(tx *gorm.DB) *linkRemarkCtx {
+	ctx := &linkRemarkCtx{
+		NodeName:        (&SettingService{}).GetNodeName(),
+		InboundRelay:    map[string]string{},
+		OutboundDisplay: map[string]string{},
+	}
+
+	// outbounds.tag → display_name
+	var outbounds []model.Outbound
+	if err := tx.Model(model.Outbound{}).Find(&outbounds).Error; err == nil {
+		for _, ob := range outbounds {
+			ctx.OutboundDisplay[ob.Tag] = strings.TrimSpace(ob.DisplayName)
+		}
+	}
+
+	// route.rules._nb_binding → inbound 数组 ↔ outbound 字段
+	// 数据来自 setting.config(setting 表 key='config')。
+	cfgStr, err := (&SettingService{}).GetConfig()
+	if err == nil && cfgStr != "" {
+		var cfg struct {
+			Route struct {
+				Rules []map[string]interface{} `json:"rules"`
+			} `json:"route"`
+		}
+		if json.Unmarshal([]byte(cfgStr), &cfg) == nil {
+			for _, r := range cfg.Route.Rules {
+				binding, _ := r["_nb_binding"].(bool)
+				if !binding {
+					continue
+				}
+				action, _ := r["action"].(string)
+				if action == "direct" {
+					// 显式 binding 到 direct = 直连,跳过(回到 nodeName 分支)
+					continue
+				}
+				ot, _ := r["outbound"].(string)
+				if ot == "" {
+					continue
+				}
+				inb, _ := r["inbound"].([]interface{})
+				for _, it := range inb {
+					if tag, ok := it.(string); ok && tag != "" {
+						ctx.InboundRelay[tag] = ot
+					}
+				}
+			}
+		}
+	}
+	return ctx
+}
+
 func (s *ClientService) Get(id string) (*[]model.Client, error) {
 	if id == "" {
 		return s.GetAll()
@@ -209,6 +284,7 @@ func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*mod
 	// genLink 内部按此决定 add 字段(单独 SettingService 实例,免每个 inbound
 	// 重复 SQL 查询)。
 	addrSource := (&SettingService{}).GetLinkAddrSource()
+	remarkCtx := buildLinkRemarkCtx(tx)
 	for index, client := range clients {
 		var clientLinks []map[string]string
 		// API 创建场景 Links 字段可能为空 — panel UI 总会传 [],外部
@@ -222,7 +298,7 @@ func (s *ClientService) updateLinksWithFixedInbounds(tx *gorm.DB, clients []*mod
 
 		newClientLinks := []map[string]string{}
 		for _, inbound := range inbounds {
-			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource)
+			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource, client.Name, remarkCtx.remarkPrefixFor(inbound.Tag))
 			for _, newLink := range newLinks {
 				newClientLinks = append(newClientLinks, map[string]string{
 					"remark": inbound.Tag,
@@ -260,6 +336,7 @@ func (s *ClientService) UpdateClientsOnInboundAdd(tx *gorm.DB, initIds string, i
 		return err
 	}
 	addrSource := (&SettingService{}).GetLinkAddrSource()
+	remarkCtx := buildLinkRemarkCtx(tx)
 	for _, client := range clients {
 		// Add inbounds
 		var clientInbounds []uint
@@ -272,7 +349,7 @@ func (s *ClientService) UpdateClientsOnInboundAdd(tx *gorm.DB, initIds string, i
 		// Add links
 		var clientLinks, newClientLinks []map[string]string
 		json.Unmarshal(client.Links, &clientLinks)
-		newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource)
+		newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource, client.Name, remarkCtx.remarkPrefixFor(inbound.Tag))
 		for _, newLink := range newLinks {
 			newClientLinks = append(newClientLinks, map[string]string{
 				"remark": inbound.Tag,
@@ -348,6 +425,7 @@ func (s *ClientService) UpdateClientsOnInboundDelete(tx *gorm.DB, id uint, tag s
 func (s *ClientService) UpdateLinksByInboundChange(tx *gorm.DB, inbounds *[]model.Inbound, hostname string, oldTag string) error {
 	var err error
 	addrSource := (&SettingService{}).GetLinkAddrSource()
+	remarkCtx := buildLinkRemarkCtx(tx)
 	for _, inbound := range *inbounds {
 		var clientIds []uint
 		err = tx.Raw("SELECT clients.id FROM clients, json_each(clients.inbounds) AS je WHERE je.value = ?", inbound.Id).Scan(&clientIds).Error
@@ -365,7 +443,7 @@ func (s *ClientService) UpdateLinksByInboundChange(tx *gorm.DB, inbounds *[]mode
 		for _, client := range clients {
 			var clientLinks, newClientLinks []map[string]string
 			json.Unmarshal(client.Links, &clientLinks)
-			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource)
+			newLinks := util.LinkGenerator(client.Config, &inbound, hostname, addrSource, client.Name, remarkCtx.remarkPrefixFor(inbound.Tag))
 			for _, newLink := range newLinks {
 				newClientLinks = append(newClientLinks, map[string]string{
 					"remark": inbound.Tag,

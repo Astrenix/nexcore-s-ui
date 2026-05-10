@@ -223,6 +223,13 @@ func (s *SettingService) GetLinkAddrSource() string {
 	return "panel"
 }
 
+// GetNodeName 返回管理员在「设置」里配的节点名称(空则空字符串)。
+// 客户端分享链接 ps / fragment 的拼接前缀用它(直连模式)。
+func (s *SettingService) GetNodeName() string {
+	v, _ := s.getString("nodeName")
+	return strings.TrimSpace(v)
+}
+
 func (s *SettingService) GetWebDomain() (string, error) {
 	return s.getString("webDomain")
 }

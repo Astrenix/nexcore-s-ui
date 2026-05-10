@@ -21,11 +21,25 @@ type LinkParam struct {
 // LinkGenerator 生成客户端分享链接。addrSource 决定 add 字段来源:
 // "panel"(默认 / 空) = 用 hostname(panel webDomain / Host)
 // "tls"               = 用 inbound.tls.server_name,通配符回退 hostname
-func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname string, addrSource string) []string {
+//
+// remark 命名规则(vmess.ps / 其它协议 #fragment):
+//   - 主前缀 remarkPrefix 由调用方算出 — 直连模式 = settings.nodeName,
+//     中转模式 = outbound.display_name(回退 outbound.tag)。空则 fallback inbound.Tag。
+//   - clientName 不空时附加 "-<clientName>",方便用户在客户端区分账号。
+//   - 同一 inbound 配多 Addrs 时,附加 addrRemark suffix 区分各 server。
+func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname string, addrSource string, clientName string, remarkPrefix string) []string {
 	linkAddrSource := addrSource
 	inbound, err := i.MarshalFull()
 	if err != nil {
 		return []string{}
+	}
+
+	baseRemark := strings.TrimSpace(remarkPrefix)
+	if baseRemark == "" {
+		baseRemark = i.Tag
+	}
+	if cn := strings.TrimSpace(clientName); cn != "" {
+		baseRemark = baseRemark + "-" + cn
 	}
 
 	var tls map[string]interface{}
@@ -60,7 +74,7 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 		Addrs = append(Addrs, map[string]interface{}{
 			"server":      serverField,
 			"server_port": (*inbound)["listen_port"],
-			"remark":      i.Tag,
+			"remark":      baseRemark,
 		})
 		if i.TlsId > 0 {
 			Addrs[0]["tls"] = tls
@@ -68,7 +82,7 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 	} else {
 		for index, addr := range Addrs {
 			addrRemark, _ := addr["remark"].(string)
-			Addrs[index]["remark"] = i.Tag + addrRemark
+			Addrs[index]["remark"] = baseRemark + addrRemark
 			if i.TlsId > 0 {
 				newTls := map[string]interface{}{}
 				for k, v := range tls {

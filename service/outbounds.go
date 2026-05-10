@@ -23,9 +23,10 @@ func (o *OutboundService) GetAll() (*[]map[string]interface{}, error) {
 	var data []map[string]interface{}
 	for _, outbound := range outbounds {
 		outData := map[string]interface{}{
-			"id":   outbound.Id,
-			"type": outbound.Type,
-			"tag":  outbound.Tag,
+			"id":           outbound.Id,
+			"type":         outbound.Type,
+			"tag":          outbound.Tag,
+			"display_name": outbound.DisplayName, // 中转名称,用于分享链接 ps 字段
 		}
 		if outbound.Options != nil {
 			var restFields map[string]json.RawMessage

@@ -209,7 +209,7 @@ const defaultValues: Record<InType, Inbound> = {
   mixed: <Mixed>{ type: InTypes.Mixed },
   socks: <SOCKS>{ type: InTypes.SOCKS },
   http: <HTTP>{ type: InTypes.HTTP, tls_id: 0 },
-  shadowsocks: <Shadowsocks>{ type: InTypes.Shadowsocks, method: 'none' },
+  shadowsocks: <Shadowsocks>{ type: InTypes.Shadowsocks, method: 'aes-128-gcm' },
   vmess: <VMess>{ type: InTypes.VMess, tls_id: 0, transport: {} },
   trojan: <Trojan>{ type: InTypes.Trojan, tls_id: 0, transport: {} },
   naive: <Naive>{ type: InTypes.Naive, tls_id: 0 },

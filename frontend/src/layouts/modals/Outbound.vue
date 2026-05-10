@@ -52,6 +52,9 @@
         <el-form-item :label="$t('objects.tag')">
           <el-input v-model="outbound.tag" :disabled="title === 'edit'" placeholder="字母数字 . _ -;路由用此 tag 引用" />
         </el-form-item>
+        <el-form-item label="中转名称(分享链接 ps 前缀)">
+          <el-input v-model="outbound.display_name" placeholder="如「香港落地」、「东京 BGP」(留空回退到 tag)" />
+        </el-form-item>
         <template v-if="!NoServer.includes(outbound.type)">
           <el-form-item :label="$t('out.addr')">
             <el-input v-model="outbound.server" placeholder="远端域名或 IP" />
@@ -352,11 +355,11 @@ const jsonError = ref('')
 
 const NoServer = [OutTypes.Direct, OutTypes.Selector, OutTypes.URLTest, OutTypes.Tor]
 
-// 常见 SS 加密方法 — 覆盖 SS-2022 + 经典 AEAD
+// 常见 SS 加密方法 — 覆盖 SS-2022 + 经典 AEAD。
+// sing-box 1.13+ 不再支持 'none' / stream-cipher 系,从下拉里移除。
 const SS_METHODS = [
   '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305',
   'aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305', 'xchacha20-ietf-poly1305',
-  'none',
 ]
 const VMESS_SECURITY = ['auto', 'none', 'aes-128-gcm', 'chacha20-poly1305', 'zero']
 const UTLS_FPS = ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', 'random', 'randomized']
@@ -438,6 +441,7 @@ const onJsonEdit = () => {
 
 watch(() => outbound.value.type, refreshJson)
 watch(() => outbound.value.tag, refreshJson)
+watch(() => outbound.value.display_name, refreshJson)
 watch(() => outbound.value.server, refreshJson)
 watch(() => outbound.value.server_port, refreshJson)
 watch(() => outbound.value.uuid, refreshJson)

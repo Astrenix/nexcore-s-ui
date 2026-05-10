@@ -246,7 +246,7 @@ const defaultValues: Record<OutType, Outbound> = {
   direct: { type: OutTypes.Direct },
   socks: { type: OutTypes.SOCKS, version: "5" },
   http: { type: OutTypes.HTTP, tls: {} },
-  shadowsocks: { type: OutTypes.Shadowsocks, method: 'none', multiplex: {} },
+  shadowsocks: { type: OutTypes.Shadowsocks, method: 'aes-128-gcm', multiplex: {} },
   vmess: { type: OutTypes.VMess, tls: {}, multiplex: {}, transport: {}, security: 'auto', global_padding: false },
   trojan: { type: OutTypes.Trojan, tls: {}, multiplex: {}, transport: {} },
   naive: { type: OutTypes.Naive, tls: { enabled: true } },

@@ -129,6 +129,13 @@ func (s *InboundService) Save(tx *gorm.DB, act string, data json.RawMessage, ini
 			if err != nil {
 				return err
 			}
+			// 跟 GetAllConfig 同款兜底:DB 里历史 TLS 记录可能含 sing-box 1.13.5+
+			// 已删的字段(acme.key_type 等),不在这里 sanitize 的话 MarshalJSON
+			// 把脏 server 直接拼进 inboundConfig,corePtr.AddInbound 会被 strict-unmarshal
+			// 拒("unknown field key_type")让 Save 整个失败。
+			if inbound.Tls != nil {
+				inbound.Tls.Server = SanitizeRawConfig(inbound.Tls.Server)
+			}
 		}
 		var oldTag string
 		if act == "edit" {

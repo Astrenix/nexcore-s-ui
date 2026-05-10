@@ -3,10 +3,14 @@ package model
 import "encoding/json"
 
 type Outbound struct {
-	Id      uint            `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
-	Type    string          `json:"type" form:"type"`
-	Tag     string          `json:"tag" form:"tag" gorm:"unique"`
-	Options json.RawMessage `json:"-" form:"-"`
+	Id   uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	Type string `json:"type" form:"type"`
+	Tag  string `json:"tag" form:"tag" gorm:"unique"`
+	// DisplayName 给分享链接的"中转名称":中转模式时拼 ps 字段用,
+	// 例如 ps = "<DisplayName>-<clientName>"。空则 fallback 到 Tag。
+	// 不下发给 sing-box(MarshalJSON 不输出此字段),只走前端 LoadData。
+	DisplayName string          `json:"display_name,omitempty" form:"display_name" gorm:"size:128"`
+	Options     json.RawMessage `json:"-" form:"-"`
 }
 
 func (o *Outbound) UnmarshalJSON(data []byte) error {
@@ -25,6 +29,10 @@ func (o *Outbound) UnmarshalJSON(data []byte) error {
 	delete(raw, "type")
 	o.Tag = raw["tag"].(string)
 	delete(raw, "tag")
+	if dn, ok := raw["display_name"].(string); ok {
+		o.DisplayName = dn
+	}
+	delete(raw, "display_name")
 
 	// Remaining fields
 	o.Options, err = json.MarshalIndent(raw, "", "  ")
