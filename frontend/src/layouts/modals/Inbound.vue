@@ -526,12 +526,12 @@ const persistDefaultOutbound = async (oldTag: string) => {
   }
 }
 
-// sing-box 1.13+ 删了 stream-cipher 系(包括 'none' / aes-*-cfb 等),
-// 只剩 AEAD + 2022 系 PSK 协议。把 'none' 选项也从下拉里去掉,免得用户
-// 选到撞 "unsupported method: none" 报错。需要透明代理走 ss 的极少数场景
-// 可以用 advanced JSON 编辑器自己写,不在常规 UI 暴露。
+// sing-box 1.13+ 删了 stream-cipher 系(包括 'none' / aes-*-cfb 等)。
+// 也排除 '2022-blake3-chacha20-poly1305' — sing-box 1.13.x 实测 inbound
+// 加载报 "invalid argument"(其它 5 个 SS-2022 / AEAD 都正常),原因待查,
+// 先从下拉移除避免用户撞坑。需要时走 advanced JSON 编辑器自己写。
 const SS_METHODS = [
-  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305',
+  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm',
   'aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305', 'xchacha20-ietf-poly1305',
 ]
 

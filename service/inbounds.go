@@ -82,6 +82,23 @@ func (s *InboundService) GetAll() (*[]map[string]interface{}, error) {
 		inbData["tag"] = inbound.Tag
 		inbData["tls_id"] = inbound.TlsId
 		inbData["enable"] = inbound.Enable
+		// 这三个字段不在 options 里,但前端编辑表单 + 主控对接需要拿全。
+		// 之前 GetAll 只展 options + id/type/tag/tls_id/enable,导致 addrs(多
+		// server)/ out_json(出站 JSON)/ ext(per-cred 限额)在 GET 里全丢。
+		// 都返 RawMessage(addrs/out_json)或 JSON object(ext 解析后)— 前端就可
+		// 直接读字段、不用回查单条 inbound 详情。
+		if len(inbound.Addrs) > 0 {
+			inbData["addrs"] = inbound.Addrs
+		}
+		if len(inbound.OutJson) > 0 {
+			inbData["out_json"] = inbound.OutJson
+		}
+		if inbound.Ext != "" {
+			var extObj interface{}
+			if err := json.Unmarshal([]byte(inbound.Ext), &extObj); err == nil {
+				inbData["ext"] = extObj
+			}
+		}
 		// users 一律走 clients 表多对多查,返回 client.name 字符串列表 ——
 		// 包括 Basic Auth 协议(mixed/socks/http/naive)。前端用 length 显示
 		// 客户数,统一 InboundClients modal 管理。

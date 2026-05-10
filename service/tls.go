@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
@@ -65,6 +66,16 @@ func (s *TlsService) Save(tx *gorm.DB, action string, data json.RawMessage, host
 		err = json.Unmarshal(data, &tls)
 		if err != nil {
 			return err
+		}
+		// 拒空行:前端 TLS 编辑页直接点保存(没填任何字段)会让 db.Save 创建
+		// 一条 name='' / server={} 的空行 — 之前生产 DB 里出现过 10 条空 TLS,
+		// 列表混乱 + 点编辑会报 EOF。这里硬性要求 name 非空,server 至少含
+		// enabled 字段(true/false 都行)。
+		if strings.TrimSpace(tls.Name) == "" {
+			return common.NewError("tls name is required")
+		}
+		if len(tls.Server) == 0 {
+			return common.NewError("tls server config is required")
 		}
 		// 防御性兜底:有些客户端可能把 server 嵌套 RawMessage 单独提交,这里
 		// 再跑一次 sanitize 保证 ACME / port 等字段一致(stripACMEKeyType 仍保留

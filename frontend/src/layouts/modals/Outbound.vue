@@ -356,9 +356,11 @@ const jsonError = ref('')
 const NoServer = [OutTypes.Direct, OutTypes.Selector, OutTypes.URLTest, OutTypes.Tor]
 
 // 常见 SS 加密方法 — 覆盖 SS-2022 + 经典 AEAD。
-// sing-box 1.13+ 不再支持 'none' / stream-cipher 系,从下拉里移除。
+// sing-box 1.13+ 不再支持 'none' / stream-cipher 系。
+// 也排除 '2022-blake3-chacha20-poly1305' — sing-box 1.13.x inbound 加载报
+// "invalid argument"(疑似上游 bug),其它 SS-2022 / AEAD 都正常。
 const SS_METHODS = [
-  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305',
+  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm',
   'aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305', 'xchacha20-ietf-poly1305',
 ]
 const VMESS_SECURITY = ['auto', 'none', 'aes-128-gcm', 'chacha20-poly1305', 'zero']
