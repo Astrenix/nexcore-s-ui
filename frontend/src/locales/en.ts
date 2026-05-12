@@ -225,6 +225,7 @@ export default {
     test: "Test",
     testAll: "Test all",
     save: "Save",
+    cancel: "Cancel",
     update: "Update",
     submit: "Submit",
     set: "Set",

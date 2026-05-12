@@ -225,6 +225,7 @@ export default {
     test: "测试",
     testAll: "测试全部",
     save: "保存",
+    cancel: "取消",
     update: "更新",
     submit: "提交",
     set: "设置",
