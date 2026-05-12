@@ -42,6 +42,7 @@ export default {
     home: "Home",
     inbounds: "Inbounds",
     outbounds: "Outbounds",
+    subPools: "Sub Pools",
     endpoints: "Endpoints",
     clients: "Clients",
     rules: "Rules",

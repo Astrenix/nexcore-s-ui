@@ -42,6 +42,7 @@ export default {
     home: "主页",
     inbounds: "入站管理",
     outbounds: "出站管理",
+    subPools: "订阅池",
     endpoints: "节点管理",
     clients: "用户管理",
     rules: "路由列表",

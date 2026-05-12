@@ -49,6 +49,7 @@ type Controller struct {
 	serverSvc   service.ServerService
 	cfSvc       service.CloudflareService
 	logSvc      service.ApiLogService
+	subSvc      service.SubService
 }
 
 func New(g *gin.RouterGroup) *Controller {
@@ -187,6 +188,17 @@ func (a *Controller) register(g *gin.RouterGroup) {
 	sui.POST("/cloudflare/tls/issue", a.cfIssueTLS)
 	// sing-box 完整运行时配置(getSingboxConfig 等价)
 	sui.GET("/singbox/raw-config", a.suiSingboxRaw)
+
+	// 订阅池 — 机场订阅导入 + 自动刷新 + Winner 选举 + 入站按国家绑定
+	// 详见 service/sub.go + cronjob/subJob.go
+	sui.GET("/subs", a.listSubs)
+	sui.POST("/subs", a.createSub)
+	sui.PUT("/subs/:id", a.updateSub)
+	sui.DELETE("/subs/:id", a.deleteSub)
+	sui.POST("/subs/:id/refresh", a.refreshSub)
+	sui.GET("/sub-nodes", a.listSubNodes)
+	sui.GET("/sub-pools", a.listSubPools)
+	sui.POST("/sub-pools/elect", a.electWinners)
 }
 
 // ---------- handlers: status & health ----------

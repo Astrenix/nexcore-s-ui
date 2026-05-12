@@ -589,14 +589,22 @@ func buildInboundRelayMap() map[string]string {
 // 给 GetAll 给每个含中转关系的 inbound 行回填 outbound 的中转名称用。
 // 跟 client.go::buildLinkRemarkCtx 复制一份是为了 InboundService 不依赖
 // ClientService 的私有 ctx 类型。
+//
+// v1.7.26:订阅池出站独立到 pool_outbounds 表,这里两表 union(用户手配出站 +
+// 订阅池 winner),tag 命名空间不重(pool- 前缀强制 + uniqueIndex)。
 func buildOutboundDisplayMap() map[string]string {
 	out := map[string]string{}
 	var obs []model.Outbound
-	if err := database.GetDB().Model(model.Outbound{}).Find(&obs).Error; err != nil {
-		return out
+	if err := database.GetDB().Model(model.Outbound{}).Find(&obs).Error; err == nil {
+		for _, ob := range obs {
+			out[ob.Tag] = strings.TrimSpace(ob.DisplayName)
+		}
 	}
-	for _, ob := range obs {
-		out[ob.Tag] = strings.TrimSpace(ob.DisplayName)
+	var pools []model.PoolOutbound
+	if err := database.GetDB().Model(model.PoolOutbound{}).Find(&pools).Error; err == nil {
+		for _, po := range pools {
+			out[po.Tag] = strings.TrimSpace(po.DisplayName)
+		}
 	}
 	return out
 }

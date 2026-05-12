@@ -62,13 +62,20 @@ func buildLinkRemarkCtx(tx *gorm.DB) *linkRemarkCtx {
 		OutboundDisplay: map[string]string{},
 	}
 
-	// outbounds.tag → display_name
+	// outbounds.tag → display_name(用户手配)
 	var outbounds []model.Outbound
 	if err := tx.Model(model.Outbound{}).Find(&outbounds).Error; err != nil {
 		logger.Warning("buildLinkRemarkCtx: load outbounds:", err)
 	} else {
 		for _, ob := range outbounds {
 			ctx.OutboundDisplay[ob.Tag] = strings.TrimSpace(ob.DisplayName)
+		}
+	}
+	// pool_outbounds.tag → display_name(订阅池 winner;v1.7.26 后独立到该表)
+	var pools []model.PoolOutbound
+	if err := tx.Model(model.PoolOutbound{}).Find(&pools).Error; err == nil {
+		for _, po := range pools {
+			ctx.OutboundDisplay[po.Tag] = strings.TrimSpace(po.DisplayName)
 		}
 	}
 

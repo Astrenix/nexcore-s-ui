@@ -98,12 +98,20 @@
         <el-form-item label="中转目标(可选)">
           <el-select v-model="defaultOutbound" filterable placeholder="本机按全局路由出公网(不中转)" style="width: 100%">
             <el-option value="inherit" label="本机按全局路由出公网(不中转)" />
-            <el-option-group v-if="proxyOutbounds.length" label="转发到落地节点">
+            <el-option-group v-if="manualProxyOutbounds.length" label="转发到落地节点(用户手配)">
               <el-option
-                v-for="o in proxyOutbounds"
+                v-for="o in manualProxyOutbounds"
                 :key="o.tag"
                 :value="o.tag"
                 :label="o.display_name ? `→ ${o.tag} · ${o.display_name}` : `→ ${o.tag}`"
+              />
+            </el-option-group>
+            <el-option-group v-if="poolProxyOutbounds.length" label="转发到订阅池(按国家自动维护 winner)">
+              <el-option
+                v-for="o in poolProxyOutbounds"
+                :key="o.tag"
+                :value="o.tag"
+                :label="o.display_name ? `🌐 ${o.tag} · ${o.display_name}` : `🌐 ${o.tag}`"
               />
             </el-option-group>
             <el-option-group v-if="endpointOutbounds.length" label="转发到虚拟网卡端点">
@@ -479,12 +487,28 @@ const PROXY_OUTBOUND_TYPES = new Set([
 // 列表 + label:label = "tag · 中转名称",中转名称空时只显示 tag。
 // 下拉 :value 仍是 tag(写入 route.rules.outbound 还是 tag);只是 label
 // 让用户能直接看到出站对应的中转标识,免得只看 tag 猜不出哪个落地。
-const proxyOutbounds = computed((): { tag: string; display_name: string }[] =>
-  ((Data().outbounds as any[]) ?? [])
+//
+// v1.7.26:union 用户手配 outbounds + 订阅池 poolOutbounds。pool 出站标 from_pool=true,
+// 前端下拉可视化区分(加 [订阅池] tag),user 不会把它跟手配出站混淆。
+const proxyOutbounds = computed((): { tag: string; display_name: string; from_pool?: boolean }[] => {
+  const manual = ((Data().outbounds as any[]) ?? [])
     .filter((o: any) => o?.tag && PROXY_OUTBOUND_TYPES.has(o.type))
-    .map((o: any) => ({ tag: o.tag, display_name: (o.display_name || '').trim() })),
-)
+    .map((o: any) => ({ tag: o.tag, display_name: (o.display_name || '').trim() }))
+  // 订阅池出站:type 一定属于 PROXY_OUTBOUND_TYPES(anytls/vless/vmess/trojan 等),
+  // 不需要再过滤;但保险起见 type 也过一遍。
+  const pool = ((Data().poolOutbounds as any[]) ?? [])
+    .filter((o: any) => o?.tag && PROXY_OUTBOUND_TYPES.has(o.type))
+    .map((o: any) => ({
+      tag: o.tag,
+      display_name: (o.display_name || '').trim(),
+      from_pool: true,
+    }))
+  return [...manual, ...pool]
+})
 const proxyOutTags = computed((): string[] => proxyOutbounds.value.map((o) => o.tag))
+// 分组展示:手配 vs 订阅池,下拉里两个 option-group 分开,避免视觉混淆
+const manualProxyOutbounds = computed(() => proxyOutbounds.value.filter((o) => !o.from_pool))
+const poolProxyOutbounds = computed(() => proxyOutbounds.value.filter((o) => o.from_pool))
 const endpointOutbounds = computed((): { tag: string; type: string }[] =>
   ((Data().endpoints as any[]) ?? [])
     .filter((e: any) => e?.tag)

@@ -146,6 +146,9 @@ func InitDB(dbPath string) error {
 		&model.Changes{},
 		&model.ApiLog{},
 		&model.BlockRule{},
+		&model.Sub{},
+		&model.SubNode{},
+		&model.PoolOutbound{},
 	)
 	if err != nil {
 		return err
@@ -153,12 +156,60 @@ func InitDB(dbPath string) error {
 	// 老数据库新加的 inbounds.enable 列对历史行可能落到 NULL;
 	// 显式回填一次,确保升级后所有现存入站默认是启用状态。
 	db.Exec("UPDATE inbounds SET enable = 1 WHERE enable IS NULL")
+
+	// 一次性迁移:订阅池 v1 把 pool-{cc} 写到 outbounds 表,v2 拆到独立 pool_outbounds 表。
+	// 把存量 pool-* 行搬过去,清出 outbounds 表,让旧出站管理 UI 干净。
+	// 安全 guard:只搬还没在 pool_outbounds 出现的 tag;tag 冲突保留 pool_outbounds 那条。
+	if err := migrateLegacyPoolOutbounds(db); err != nil {
+		return err
+	}
+
 	err = initUser()
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// migrateLegacyPoolOutbounds 把 outbounds 表里 tag 以 "pool-" 开头的行
+// 搬到 pool_outbounds 表(订阅池 v1 → v2 拆表迁移)。
+//
+// 幂等:第二次执行时 INSERT OR IGNORE,已存在的 pool_outbound 不被覆盖。
+// 失败容忍:任何一步出错只记 warning,不阻塞启动 — 用户实在搬不过去手 sqlite 处理。
+func migrateLegacyPoolOutbounds(db *gorm.DB) error {
+	// 用 raw SQL 一把搬过去 + 删原行,事务内完成
+	return db.Transaction(func(tx *gorm.DB) error {
+		// 1. 取 outbounds 表里所有 pool-* 行(legacy)
+		type legacyRow struct {
+			Id          uint
+			Type        string
+			Tag         string
+			DisplayName string
+			Options     []byte
+		}
+		var rows []legacyRow
+		if err := tx.Table("outbounds").
+			Select("id, type, tag, display_name, options").
+			Where("tag LIKE ?", "pool-%").Find(&rows).Error; err != nil {
+			return nil // 老库没这些列也 OK,直接放过
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+		for _, r := range rows {
+			cc := strings.ToUpper(strings.TrimPrefix(r.Tag, "pool-"))
+			// INSERT OR IGNORE — 已经搬过的不重复
+			tx.Exec(`
+				INSERT OR IGNORE INTO pool_outbounds
+				  (tag, country, type, display_name, options, winner_node_id, winner_latency, updated_at, created_at)
+				VALUES (?, ?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
+			`, r.Tag, cc, r.Type, r.DisplayName, r.Options)
+		}
+		// 2. 删 outbounds 表里那些 pool-* 行(已经搬过去了)
+		tx.Exec("DELETE FROM outbounds WHERE tag LIKE 'pool-%'")
+		return nil
+	})
 }
 
 func GetDB() *gorm.DB {

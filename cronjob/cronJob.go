@@ -32,6 +32,12 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 		c.cron.AddJob("@every 5s", NewCheckCoreJob())
 		// database WAL checkpoint
 		c.cron.AddJob("@every 10m", NewWALCheckpointJob())
+		// 订阅自动刷新 — 每 1min 扫一次 subs 表看哪个到期(refresh_interval 单位分钟,
+		// 默认 60min);到期就 fetch → parse → probe → upsert sub_nodes → re-elect winners
+		c.cron.AddJob("@every 1m", NewSubRefreshJob())
+		// 订阅 winner 巡检 — 每 5min 检查所有 pool-{cc} 出站当前 winner 是否还活;
+		// 死了立刻从 sub_nodes 同国家次优 alive 节点 re-elect
+		c.cron.AddJob("@every 5m", NewSubWinnerCheckJob())
 	}()
 
 	return nil

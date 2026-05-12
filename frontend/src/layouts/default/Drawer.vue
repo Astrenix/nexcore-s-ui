@@ -66,6 +66,7 @@ import {
   Close,
   CircleClose,
   SwitchButton,
+  Files,
 } from '@element-plus/icons-vue'
 import { markRaw } from 'vue'
 
@@ -84,6 +85,7 @@ const menu = [
   { title: 'pages.home',      icon: markRaw(House),       path: '/' },
   { title: 'pages.inbounds',  icon: markRaw(Download),    path: '/inbounds' },
   { title: 'pages.outbounds', icon: markRaw(Upload),      path: '/outbounds' },
+  { title: 'pages.subPools',  icon: markRaw(Files),       path: '/sub-pools' },
   { title: 'pages.endpoints', icon: markRaw(PriceTag),    path: '/endpoints' },
   { title: 'pages.tls',       icon: markRaw(Lock),        path: '/tls' },
   { title: 'pages.rules',     icon: markRaw(Connection),  path: '/rules' },

@@ -83,6 +83,16 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.CFIssueTLS(c)
 	case "panelSslIssue":
 		a.ApiService.PanelSslIssue(c)
+	case "subSave":
+		a.ApiService.ApiSubSave(c)
+	case "subDelete":
+		a.ApiService.ApiSubDelete(c)
+	case "subRefresh":
+		a.ApiService.ApiSubRefresh(c)
+	case "electWinners":
+		a.ApiService.ApiElectWinners(c)
+	case "poolOutboundSave":
+		a.ApiService.ApiPoolOutboundSave(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}
@@ -144,6 +154,14 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetCheckOutbound(c)
 	case "apiLogs":
 		a.handleApiLogs(c)
+	case "subs":
+		a.ApiService.ApiSubList(c)
+	case "subNodes":
+		a.ApiService.ApiSubNodes(c)
+	case "subPools":
+		a.ApiService.ApiSubPools(c)
+	case "poolOutbounds":
+		a.ApiService.ApiPoolOutbounds(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}

@@ -29,6 +29,7 @@ type ApiService struct {
 	service.CloudflareService
 	service.FirewallService
 	service.PanelSSLService
+	service.SubService
 }
 
 // GetCfCredentials 返回持久化的 CF token + ACME 邮箱(供前端预填表单)。

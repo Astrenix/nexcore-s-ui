@@ -33,6 +33,7 @@ type ConfigService struct {
 	OutboundService
 	EndpointService
 	BlockRuleService
+	SubService
 }
 
 // ensureBuiltinOutbounds 保证最终 config 至少包含 tag=direct 出站。
@@ -89,6 +90,15 @@ func (s *ConfigService) GetConfig(data string) (*[]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 合并订阅池出站(pool_outbounds 表 — 跟用户手配的 outbounds 表分离,
+	// sing-box 看到的是 union 后的完整列表,内部表分布对 core 透明)。
+	// pool_outbounds 由 SubService.ElectWinners 自动维护,tag 形如 pool-{cc},
+	// 不重名(uniqueIndex)。
+	poolOutConfigs, err := s.SubService.GetPoolOutboundConfigs()
+	if err != nil {
+		return nil, err
+	}
+	singboxConfig.Outbounds = append(singboxConfig.Outbounds, poolOutConfigs...)
 	// 兜底:必须存在 `direct` 出站。
 	// rule-set 默认 `download_detour: "direct"`,DNS 默认规则也会把私网 / geoip-cn
 	// 路由到 direct;一旦用户把 direct 出站删了或从未建过(空 DB 状态),

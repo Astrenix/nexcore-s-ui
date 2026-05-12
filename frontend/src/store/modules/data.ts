@@ -22,6 +22,8 @@ const Data = defineStore('Data', {
     config: <any>{},
     inbounds: <any[]>[],
     outbounds: <any[]>[],
+    // 订阅池出站(pool_outbounds 表),独立于 outbounds;入站编辑器要列出来给中转绑定用
+    poolOutbounds: <any[]>[],
     endpoints: <any[]>[],
     clients: <any>[],
     tlsConfigs: <any[]>[],
@@ -67,6 +69,12 @@ const Data = defineStore('Data', {
           this.setNewData(msg.obj)
         }
       }
+      // 并行拉订阅池出站(独立 API,不阻塞主 load)
+      // 失败容忍 — 没有订阅池也不影响主流程
+      try {
+        const po = await HttpUtils.get('api/poolOutbounds')
+        if (po.success) this.poolOutbounds = po.obj || []
+      } catch (e) { /* ignore */ }
     },
     setNewData(data: any) {
       this.lastLoad = Math.floor((new Date()).getTime() / 1000)

@@ -514,11 +514,15 @@ const addrSourceTooltip = (row: any): string => {
   return `本入站已单独覆盖为:${ADDR_SRC_LABEL[inb] ?? inb}`
 }
 
+// v1.7.26:tag 命名空间合并查找,先 outbounds 表(用户手配),再 pool_outbounds(订阅池)。
+// 没有这一步入站列表里绑了 pool-jp 的行只会显示「→ pool-jp」,丢失中转名称。
 const relayDisplayName = (inboundTag: string): string => {
   const ot = relayOf(inboundTag)
   if (!ot) return ''
   const ob = ((Data().outbounds as any[]) ?? []).find((o: any) => o?.tag === ot)
-  return (ob?.display_name || '').trim()
+  if (ob?.display_name) return String(ob.display_name).trim()
+  const po = ((Data().poolOutbounds as any[]) ?? []).find((o: any) => o?.tag === ot)
+  return (po?.display_name || '').trim()
 }
 
 const filtered = (list: any[]) => {

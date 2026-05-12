@@ -30,6 +30,13 @@ const routes = [
         component: () => import('@/views/Outbounds.vue'),
       },
       {
+        // 订阅池:导入机场订阅链接,自动探测 + 国家分组 + Winner 选举 → 写 pool-{cc} 出站。
+        // 入站可绑 "订阅池(选国家)",节点更新对入站透明。详见后端 service/sub.go。
+        path: '/sub-pools',
+        name: 'pages.subPools',
+        component: () => import('@/views/SubPools.vue'),
+      },
+      {
         path: '/endpoints',
         name: 'pages.endpoints',
         component: () => import('@/views/Endpoints.vue'),
