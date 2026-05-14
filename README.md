@@ -1,158 +1,158 @@
 # NexCore s-ui
 
-基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) 二开的 sing-box 节点控制面板,以
-**API 优先 + 自动化部署 + 主控互通**为目标。适合自部署节点服务器,把它接入业务系统/
-代理调度系统作为受控节点;也适合个人单机部署。
+A sing-box node control panel based on [alireza0/s-ui](https://github.com/alireza0/s-ui), with
+**API-First + Automated Deployment + Master-Node Communication** as the goal. Suitable for self-deployed node servers, integrate it into business systems/
+proxy scheduling systems as controlled nodes; also suitable for personal standalone deployment.
 
-> 与原版的差异:前端 Vue 3 + Element Plus 完整重写、无人值守 install.sh / update.sh、
-> 默认凭据全随机、首装即随机端口、`/api/v1/*` 完整 REST 体系且 **与
-> [nexcore-x-ui](https://github.com/DoBestone/nexcore-x-ui) 主控对接代码 100% 兼容**、
-> Cloudflare API Token 一键 DNS-01 自动签证书 + 自动续签、API 调用日志审计、
-> 内嵌 API 文档,与上游 `s-ui` 路径 / 服务名 / 端口完全独立,可同机共存。
-
----
-
-## 系统要求
-
-- **推荐**:**Ubuntu 24.04 LTS**(本仓库主测目标,从 install → upgrade → 全协议入站 / 出站 / 中转都跑过端到端验证)
-- **兼容**:Ubuntu 20.04+ / Debian 11+ / CentOS Stream 8+ / OpenCloudOS / 任意带 systemd 的现代 Linux
-- **架构**:`amd64` / `arm64` / `386` / `armv5` / `armv6` / `armv7` / `s390x`
-- **二进制**:GitHub Actions CI 用 **musl 静态编译**(Bootlin toolchain),**不依赖 host glibc 版本**;Ubuntu 20.04 这种老发行版也能直接跑 release 包
-- **运行身份**:root(需要 bind 80/443 低端口 + 写 ACME cert + 创建 tun 设备)
+> **Differences from the original**: Frontend completely rewritten with Vue 3 + Element Plus, unattended install.sh / update.sh,
+> default credentials fully randomized, random port on first installation, `/api/v1/*` complete REST system and **100% compatible with**
+> **[nexcore-x-ui](https://github.com/DoBestone/nexcore-x-ui) master controller integration code**,
+> Cloudflare API Token one-click DNS-01 automatic certificate signing + automatic renewal, API call audit logging,
+> embedded API documentation, completely independent from upstream `s-ui` in path / service name / port, can coexist on the same machine.
 
 ---
 
-## 一键安装
+## System Requirements
+
+- **Recommended**: **Ubuntu 24.04 LTS** (main test target of this repository, verified end-to-end from install → upgrade → all protocols inbound / outbound / relay)
+- **Compatible**: Ubuntu 20.04+ / Debian 11+ / CentOS Stream 8+ / OpenCloudOS / any modern Linux with systemd
+- **Architecture**: `amd64` / `arm64` / `386` / `armv5` / `armv6` / `armv7` / `s390x`
+- **Binary**: GitHub Actions CI using **musl static compilation** (Bootlin toolchain), **not dependent on host glibc version**; can run release packages directly on old distributions like Ubuntu 20.04
+- **Running Identity**: root (required to bind ports 80/443 + write ACME cert + create tun device)
+
+---
+
+## One-Click Installation
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/install.sh)
 ```
 
-指定版本:
+Specify version:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/install.sh) v1.0.0
 ```
 
-强制重装(覆盖二进制,**保留 db**):
+Force reinstall (overwrite binary, **preserve db**):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/install.sh) --force
 ```
 
-安装结束后脚本会**直接打印登录信息**(随机用户名 / 随机密码 / 面板 URI),形如:
+After installation, the script will **directly print login information** (random username / random password / panel URI), like:
 
 ```
 ═════════════════════════════════════════════
-  nexcore-s-ui 已部署
+  nexcore-s-ui deployed
 ═════════════════════════════════════════════
 Current panel settings:
         Panel port:      3095
         Panel path:      /app/
 
-访问地址:
+Access address:
 http://1.2.3.4:3095/app/
 
-首装明文凭据 (★ 立即记录,后续只能 nexcore-s-ui 菜单重置):
-  用户名: admin_a3f9k2
-  密 码:  9KqL4mPzN2vR
+First installation plaintext credentials (★ Record immediately, can only be reset via nexcore-s-ui menu):
+  Username: admin_a3f9k2
+  Password:  9KqL4mPzN2vR
 ```
 
-凭据**只此一次**,关掉终端就再也回看不到 — 立即记录。
+Credentials **only this once**, close the terminal and you'll never see them again — record immediately.
 
-支持的 CPU 架构:`amd64` / `386` / `arm64` / `armv7` / `armv6` / `armv5` / `s390x`(Linux + systemd)。
+Supported CPU architectures: `amd64` / `386` / `arm64` / `armv7` / `armv6` / `armv5` / `s390x` (Linux + systemd).
 
 ---
 
-## 管理命令(`nexcore-s-ui` CLI)
+## Management Commands (`nexcore-s-ui` CLI)
 
-### 服务控制
+### Service Control
 ```text
-nexcore-s-ui                  进入交互菜单
-nexcore-s-ui start|stop|restart  启停服务
-nexcore-s-ui status           状态摘要
-nexcore-s-ui enable|disable   开机自启
-nexcore-s-ui log              查看日志
+nexcore-s-ui                  Enter interactive menu
+nexcore-s-ui start|stop|restart  Start/stop service
+nexcore-s-ui status           Status summary
+nexcore-s-ui enable|disable   Boot autostart
+nexcore-s-ui log              View logs
 ```
 
-### 安装生命周期
+### Installation Lifecycle
 ```text
-nexcore-s-ui install [tag]    安装 / 升级
-nexcore-s-ui update [tag]     等价于 install (db 自动保留)
-nexcore-s-ui uninstall        卸载(连数据一起删)
+nexcore-s-ui install [tag]    Install / Upgrade
+nexcore-s-ui update [tag]     Equivalent to install (db automatically preserved)
+nexcore-s-ui uninstall        Uninstall (delete data too)
 ```
 
-### 凭据 / 端口
+### Credentials / Port
 
 ```text
-sui admin -show                              显示当前管理员
-sui admin -username <u> -password <p>        修改账号密码
-sui setting -port <N>                        改面板端口
-sui setting -path </app/>                    改面板路径
-sui setting -subPort <N>                     改订阅端口
-sui setting -show                            显示所有 settings
-sui uri                                      打印面板访问 URL(含 LAN / 公网)
+sui admin -show                              Show current administrator
+sui admin -username <u> -password <p>        Change account password
+sui setting -port <N>                        Change panel port
+sui setting -path </app/>                    Change panel path
+sui setting -subPort <N>                     Change subscription port
+sui setting -show                            Show all settings
+sui uri                                      Print panel access URL (LAN / Public)
 ```
 
-> `sui` 是底层二进制(`/usr/local/nexcore-s-ui/sui`),`nexcore-s-ui` 是 systemd /
-> 安装层包装。两者并存。
+> `sui` is the underlying binary (`/usr/local/nexcore-s-ui/sui`), `nexcore-s-ui` is the systemd /
+> installation layer wrapper. Both coexist.
 
-完整菜单:`nexcore-s-ui help`。
+Full menu: `nexcore-s-ui help`.
 
 ---
 
-## 面板能力
+## Panel Features
 
-- **运行态总览** — CPU / 内存 / 磁盘 / 网络速率 / sing-box 运行状态 / Goroutine 数
-- **入站管理** — 协议覆盖 VLESS / VMess / Trojan / Shadowsocks / ShadowTLS /
+- **Runtime Overview** — CPU / Memory / Disk / Network Speed / sing-box running status / Goroutine count
+- **Inbound Management** — Protocol coverage VLESS / VMess / Trojan / Shadowsocks / ShadowTLS /
   Hysteria(2)/ Naive / TUIC / AnyTLS / WireGuard / Tailscale / Warp / Tor /
-  SSH / Reality / ECH / 全 XTLS
-- **路由 / 屏蔽规则** — 规则集 + 规则双层管理,**一键模板**:屏蔽广告 / 恶意 /
-  钓鱼 / 中国大陆直连 / 私有 IP 直连 / 推荐套装
-- **客户端订阅** — 原生链接、JSON、Clash + 元信息(流量 / 上下行 / 过期),
-  二维码内嵌
-- **TLS 中心** — 普通证书 + Reality + ECH + ACME(含 **Cloudflare 一键自动**)
-- **流量统计** — 入站 / 出站 / 用户三维度 + 客户端流量榜 Top 5
-- **API 控制台**(本仓库新增)
-  - **Token 管理**:命名 token、TTL、撤销、明文一次回显
-  - **调用日志**:每次 `/apiv2/*` 与 `/api/v1/*` 调用的 method/path/status/
-    latency/IP/Token 备注都落库,带筛选 + 分页 + 一键清空
-  - **API 文档**:从前端嵌入,基础 URL + curl 示例 + 全部端点速查 +
-    `/api/v1` 兼容映射
+  SSH / Reality / ECH / Full XTLS
+- **Routing / Blocking Rules** — Rule set + two-layer rule management, **one-click templates**: block ads / malware /
+  phishing / China mainland direct connection / private IP direct connection / recommended packages
+- **Client Subscription** — Native links, JSON, Clash + metadata (traffic / upload/download / expiry),
+  QR code embedded
+- **TLS Center** — Regular certificates + Reality + ECH + ACME (including **Cloudflare one-click automatic**)
+- **Traffic Statistics** — Inbound / Outbound / User three dimensions + top 5 client traffic leaderboard
+- **API Console** (new in this repository)
+  - **Token Management**: named tokens, TTL, revocation, plaintext one-time display
+  - **Call Logs**: each call to `/apiv2/*` and `/api/v1/*` method/path/status/
+    latency/IP/Token remarks are persisted, with filtering + pagination + one-click clear
+  - **API Documentation**: embedded from frontend, base URL + curl examples + all endpoints quick reference +
+    `/api/v1` compatibility mapping
 
 ---
 
-## Cloudflare 一键签发 TLS
+## Cloudflare One-Click TLS Signing
 
-面板 → **TLS 设置** → **Cloudflare 一键签发**,3 步完成域名解析 + 证书签发:
+Panel → **TLS Settings** → **Cloudflare One-Click Signing**, complete in 3 steps: domain resolution + certificate signing:
 
-1. **Token + 邮箱** — 粘贴 Cloudflare API Token(权限 `Zone:DNS:Edit + Zone:Read`,
-   Global Key 也支持),填 ACME 注册邮箱
-2. **DNS** — 选根域、选前缀策略(随机 / 自定义 / 根域)、填公网 IP(可一键
-   自动获取)、决定是否走 CF 反代
-3. **签发** — 给 TLS 配置取个名,提交。完事
+1. **Token + Email** — Paste Cloudflare API Token (permissions `Zone:DNS:Edit + Zone:Read`,
+   Global Key also supported), fill ACME registration email
+2. **DNS** — Select root domain, choose prefix strategy (random / custom / root domain), fill public IP (can
+   auto-fetch one-click), decide whether to proxy via CF
+3. **Sign** — Name the TLS configuration, submit. Done.
 
-幕后:面板调 CF API 加 A 记录 → 写入 sing-box ACME-via-Cloudflare TLS 配置 →
-sing-box 启动时由内置 ACME 客户端走 DNS-01 挑战签证书,**后续自动续签**,
-Token 不持久化(只下发给 sing-box 内嵌使用)。
+Behind the scenes: panel calls CF API to add A record → write sing-box ACME-via-Cloudflare TLS configuration →
+sing-box automatically signs certificate via built-in ACME client using DNS-01 challenge, **automatic renewal afterwards**,
+Token not persisted (only sent to sing-box for embedded use).
 
-API 调用版:
+API call version:
 
 ```bash
 TOKEN=...  ; CF=...  ; BASE=http://node:3095/app/api/v1
 
-# 1) 查可签发的 zone
+# 1) Query signable zones
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -X POST -d "{\"token\":\"$CF\"}" $BASE/sui/cloudflare/zones
 
-# 2) 加 A 记录(随机前缀)
+# 2) Add A record (random prefix)
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -X POST $BASE/sui/cloudflare/dns/upsert-a -d "{
     \"token\":\"$CF\",\"zoneId\":\"<zone-id>\",
     \"random\":true,\"prefix\":\"nodeA\",
     \"ip\":\"1.2.3.4\",\"proxied\":false}"
 
-# 3) 生成内嵌 ACME 配置的 TLS 记录
+# 3) Generate TLS record with embedded ACME configuration
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -X POST $BASE/sui/cloudflare/tls/issue -d "{
     \"name\":\"cf-auto\",\"fqdn\":\"nodeA-x9k3m2.example.com\",
@@ -163,22 +163,22 @@ curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
 
 ## REST API
 
-三层并存,各有取舍:
+Three layers coexist, each with tradeoffs:
 
-| 前缀 | 鉴权 | 响应壳 | 用途 |
+| Prefix | Auth | Response Shell | Purpose |
 |---|---|---|---|
-| `/api/*` | session cookie | `{success, msg, obj}` | 面板 UI 自身 |
-| `/apiv2/*` | Bearer / X-API-Token / Token | `{success, msg, obj}` | 通用脚本对接 |
-| `/api/v1/*` | Bearer / X-API-Token | `{data}` / `{error,code,message,details}` | **`nexcore-x-ui` 兼容**,主控直接接入 |
+| `/api/*` | session cookie | `{success, msg, obj}` | Panel UI itself |
+| `/apiv2/*` | Bearer / X-API-Token / Token | `{success, msg, obj}` | Generic script integration |
+| `/api/v1/*` | Bearer / X-API-Token | `{data}` / `{error,code,message,details}` | **`nexcore-x-ui` compatible**, master controller direct integration |
 
-完整文档已嵌入面板,登录后进入 **API 管理 → API 文档** 即可看到。导览(`/api/v1`):
+Complete documentation is embedded in the panel. After login, go to **API Management → API Documentation** to view. Quick reference (`/api/v1`):
 
-| 资源 | 端点 |
+| Resource | Endpoint |
 |---|---|
 | Liveness | `GET /api/v1/health` |
-| 鉴权自检 | `GET /api/v1/me` |
+| Auth self-check | `GET /api/v1/me` |
 | Server | `GET /server/status` |
-| sing-box | `GET /xray/status` · `POST /xray/restart` · `GET /xray/config` · `GET /xray/logs`(`xray` 命名兼容主控) |
+| sing-box | `GET /xray/status` · `POST /xray/restart` · `GET /xray/config` · `GET /xray/logs` (`xray` naming for master controller compatibility) |
 | Inbounds | `GET\|POST /inbounds` · `GET\|PUT\|DELETE /inbounds/:id` |
 | Outbounds | `GET\|POST /outbounds` · `GET\|PUT\|DELETE /outbounds/:id` |
 | Endpoints / Services / TLS | `GET /endpoints` · `GET /services` · `GET /tls` |
@@ -189,121 +189,118 @@ curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
 | Settings | `GET\|PATCH /settings` |
 | Access logs | `GET\|DELETE /access-logs` |
 | System | `POST /system/restart-panel` |
-| Cloudflare(s-ui only) | `POST /sui/cloudflare/zones` · `POST /sui/cloudflare/dns/upsert-a` · `POST /sui/cloudflare/tls/issue` |
-| sing-box raw(s-ui only) | `GET /sui/singbox/raw-config` · `GET /sui/subscription-uri` |
+| Cloudflare (s-ui only) | `POST /sui/cloudflare/zones` · `POST /sui/cloudflare/dns/upsert-a` · `POST /sui/cloudflare/tls/issue` |
+| sing-box raw (s-ui only) | `GET /sui/singbox/raw-config` · `GET /sui/subscription-uri` |
 
-业务系统接入示例:
+Business system integration example:
 
 ```bash
 TOKEN=...  ; BASE=http://node:3095/app/api/v1
 
-# 健康
+# Health
 curl $BASE/health
 
-# 当前身份
+# Current identity
 curl -H "Authorization: Bearer $TOKEN" $BASE/me
 
-# 列出所有入站
+# List all inbounds
 curl -H "Authorization: Bearer $TOKEN" $BASE/inbounds
 
-# 改面板订阅端口
+# Change panel subscription port
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -X PATCH $BASE/settings -d '{"subPort":3199}'
 
-# 客户端流量
+# Client traffic
 curl -H "Authorization: Bearer $TOKEN" $BASE/clients/alice/traffic
 ```
 
 ---
 
-## 与 nexcore-x-ui 主控对接
+## Integration with nexcore-x-ui Master Controller
 
-`/api/v1` 完全镜像 [nexcore-x-ui](https://github.com/DoBestone/nexcore-x-ui) 的 REST 形态:
-**同路径布局、同鉴权头、同响应壳、同状态码、同错误码命名、unix 毫秒时间戳**。
-为 x-ui 写的主控对接代码可直接指向本节点,无需修改:
+`/api/v1` completely mirrors [nexcore-x-ui](https://github.com/DoBestone/nexcore-x-ui) REST form:
+**Same path layout, same auth headers, same response shell, same status codes, same error code naming, unix millisecond timestamps**.
+Code written for x-ui master controller integration can point directly to this node without modification:
 
 ```diff
-- HOST=https://x-node.example.com/api/v1     # nexcore-x-ui 节点
-+ HOST=https://s-node.example.com/app/api/v1 # nexcore-s-ui 节点
-  # 同样的 Authorization: Bearer <token>
-  # 同样的 {data} / {error,code,message} 响应壳
-  # 同样的 HTTP 状态码语义
+- HOST=https://x-node.example.com/api/v1     # nexcore-x-ui node
++ HOST=https://s-node.example.com/app/api/v1 # nexcore-s-ui node
+  # Same Authorization: Bearer <token>
+  # Same {data} / {error,code,message} response shell
+  # Same HTTP status code semantics
 ```
 
-差异只在 schema 层:`/inbounds` 返回的 settings 是 sing-box 协议(不是 xray),
-主控渲染时按 `/health` 返回的 `impl` 字段(`nexcore-s-ui` vs `nexcore-x-ui`)
-分支即可。
+Differences only at schema layer: `/inbounds` returns sing-box protocol settings (not xray),
+when rendering in master controller, branch by the `impl` field returned in `/health` (`nexcore-s-ui` vs `nexcore-x-ui`).
 
 ---
 
-## 在线更新
+## Online Update
 
-CLI(已安装机器):
+CLI (already installed machine):
 
 ```bash
-nexcore-s-ui update            # 升级到最新 release
-nexcore-s-ui update v1.0.0     # 升级 / 降级到指定 tag
+nexcore-s-ui update            # Upgrade to latest release
+nexcore-s-ui update v1.0.0     # Upgrade / Downgrade to specific tag
 ```
 
-一键脚本(无需先装 CLI,适合自动化批量升级):
+One-click script (no need to install CLI first, suitable for automated batch upgrades):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/update.sh)
 bash <(curl -fsSL https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/update.sh) v1.0.0
 ```
 
-`update.sh` 与 `install.sh` 的区别:不动 `db/`(数据库 + TLS + 客户端记录完整保留)、
-不重装系统依赖、systemd unit 仅在 release 中变化时刷新且备份旧版,只:
-**下载 tarball → 校验 SHA256 → 停服务 → 替换 sui + bin/ + service →
-migrate → 启服务**。完整重装请改用 `install.sh --force`。
+The difference between `update.sh` and `install.sh`: doesn't touch `db/` (database + TLS + client records fully preserved),
+doesn't reinstall system dependencies, systemd unit only refreshes when release changes and backs up old version, only:
+**download tarball → verify SHA256 → stop service → replace sui + bin/ + service →
+migrate → start service**. For complete reinstall, use `install.sh --force` instead.
 
 ---
 
-## 配置位置
+## Configuration Locations
 
-| 路径 | 内容 |
+| Path | Content |
 |---|---|
-| `/usr/local/nexcore-s-ui/sui` | 主二进制 |
-| `/usr/local/nexcore-s-ui/bin/sing-box` | sing-box 子进程 |
-| `/usr/local/nexcore-s-ui/db/nexcore-s-ui.db` | sqlite 数据库(订阅 / 客户端 / 入站 / TLS / Token / 调用日志) |
-| `/etc/systemd/system/nexcore-s-ui.service` | systemd 单元 |
-| `/usr/bin/nexcore-s-ui` | 管理 CLI(指向 `/usr/local/nexcore-s-ui/nexcore-s-ui.sh`) |
+| `/usr/local/nexcore-s-ui/sui` | Main binary |
+| `/usr/local/nexcore-s-ui/bin/sing-box` | sing-box subprocess |
+| `/usr/local/nexcore-s-ui/db/nexcore-s-ui.db` | SQLite database (subscriptions / clients / inbounds / TLS / tokens / call logs) |
+| `/etc/systemd/system/nexcore-s-ui.service` | systemd unit |
+| `/usr/bin/nexcore-s-ui` | Management CLI (points to `/usr/local/nexcore-s-ui/nexcore-s-ui.sh`) |
 
-环境变量:
+Environment Variables:
 
-| 变量 | 默认 | 说明 |
+| Variable | Default | Description |
 |---|---|---|
-| `SUI_DB_FOLDER` | `<binary 目录>/db` | 数据库文件夹路径 |
-| `SUI_BIN_FOLDER` | `bin` | sing-box 子进程目录 |
+| `SUI_DB_FOLDER` | `<binary directory>/db` | Database folder path |
+| `SUI_BIN_FOLDER` | `bin` | sing-box subprocess directory |
 | `SUI_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
-| `SUI_DEBUG` | `false` | 调试模式 |
-| `GH_OWNER` / `GH_REPO` | `DoBestone` / `nexcore-s-ui` | 自更新源(install.sh / update.sh) |
-| `INSTALL_DIR` | `/usr/local/nexcore-s-ui` | 自定义安装目录(install.sh / update.sh) |
+| `SUI_DEBUG` | `false` | Debug mode |
+| `GH_OWNER` / `GH_REPO` | `DoBestone` / `nexcore-s-ui` | Auto-update source (install.sh / update.sh) |
+| `INSTALL_DIR` | `/usr/local/nexcore-s-ui` | Custom installation directory (install.sh / update.sh) |
 
 ---
 
-## 与上游 alireza0/s-ui 共存
+## Coexistence with Upstream alireza0/s-ui
 
-`nexcore-s-ui` 在路径 / 服务名 / 数据库 / 端口 / 命令名 / 浏览器 cookie 上与上游
-`s-ui` **完全独立**,可同机同时安装、互不干扰。
+`nexcore-s-ui` is **completely independent** from upstream `s-ui` in path / service name / database / port / command name / browser cookie, can be installed simultaneously on the same machine without interference.
 
-| 维度 | 上游 `s-ui` | `nexcore-s-ui` |
+| Dimension | Upstream `s-ui` | `nexcore-s-ui` |
 |---|---|---|
-| 安装目录 | `/usr/local/s-ui/` | `/usr/local/nexcore-s-ui/` |
-| 数据库 | `db/s-ui.db` | `db/nexcore-s-ui.db` |
+| Installation directory | `/usr/local/s-ui/` | `/usr/local/nexcore-s-ui/` |
+| Database | `db/s-ui.db` | `db/nexcore-s-ui.db` |
 | systemd | `s-ui.service` | `nexcore-s-ui.service` |
-| 管理命令 | `/usr/bin/s-ui` | `/usr/bin/nexcore-s-ui` |
-| 默认面板端口 | 2095 | **3095** |
-| 默认订阅端口 | 2096 | **3096** |
-| 浏览器 cookie | `s-ui` | `nexcore-s-ui` |
+| Management command | `/usr/bin/s-ui` | `/usr/bin/nexcore-s-ui` |
+| Default panel port | 2095 | **3095** |
+| Default subscription port | 2096 | **3096** |
+| Browser cookie | `s-ui` | `nexcore-s-ui` |
 | `sui -v` | `S-UI Panel 1.4.x` | `nexcore-s-ui 1.0.0` |
 
-两套面板需各自占用不同端口(默认值已错开)。卸载 `nexcore-s-ui` 不会触碰
-`/usr/local/s-ui/`。
+Both panels need to occupy different ports (default values already differentiated). Uninstalling `nexcore-s-ui` will not touch `/usr/local/s-ui/`.
 
 ---
 
-## 开发
+## Development
 
 ```bash
 git clone https://github.com/DoBestone/nexcore-s-ui.git
@@ -311,20 +308,19 @@ cd nexcore-s-ui
 ./build.sh
 ```
 
-`build.sh` 依次:`cd frontend && npm i && npm run build` → `cp -R frontend/dist/* web/html/` →
-`go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,with_naive_outbound,with_musl,badlinkname,tfogo_checklinkname0,with_tailscale" -o sui main.go`。
-最终产物 `./sui`(Linux / macOS arm64 约 75 MB)。
+`build.sh` sequentially: `cd frontend && npm i && npm run build` → `cp -R frontend/dist/* web/html/` →
+`go build -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor,with_naive_outbound,with_musl,badlinkname,tfogo_checklinkname0,with_tailscale" -o sui main.go`. Final product `./sui` (Linux / macOS arm64 approximately 75 MB).
 
-仅开发前端:
+Frontend development only:
 
 ```bash
 cd frontend
 npm i
-npm run dev    # vite dev server, 默认 :3000,代理 /app/api → :3095
+npm run dev    # vite dev server, default :3000, proxy /app/api → :3095
 ```
 
-打 tag 触发 CI(GitHub Actions 跨编译 7 个 linux arch + 2 个 windows arch,
-自动发布 release):
+Push tag to trigger CI (GitHub Actions cross-compile 7 linux arch + 2 windows arch,
+auto-publish release):
 
 ```bash
 git tag v1.0.1 && git push origin v1.0.1
@@ -332,11 +328,11 @@ git tag v1.0.1 && git push origin v1.0.1
 
 ---
 
-## 致谢
+## Acknowledgments
 
-Forked from [alireza0/s-ui](https://github.com/alireza0/s-ui)。
-sing-box 来自 [SagerNet](https://github.com/SagerNet/sing-box)。
-前端组件基于 [Element Plus](https://element-plus.org/) + [Vue 3](https://vuejs.org/)。
-DNS / ACME 自动化用 [Cloudflare API](https://developers.cloudflare.com/api/)。
+Forked from [alireza0/s-ui](https://github.com/alireza0/s-ui).
+sing-box from [SagerNet](https://github.com/SagerNet/sing-box).
+Frontend components based on [Element Plus](https://element-plus.org/) + [Vue 3](https://vuejs.org/).
+DNS / ACME automation uses [Cloudflare API](https://developers.cloudflare.com/api/).
 
-GPL v3。
+GPL v3.
