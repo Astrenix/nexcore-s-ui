@@ -268,18 +268,24 @@ func asAddr(addr map[string]interface{}) (server string, port float64, remark st
 }
 
 func socksLink(userConfig map[string]interface{}, addrs []map[string]interface{}) []string {
+	user, _ := userConfig["username"].(string)
+	pass, _ := userConfig["password"].(string)
+	auth := url.QueryEscape(user) + ":" + url.QueryEscape(pass)
 	var links []string
 	for _, addr := range addrs {
 		server, port, _, ok := asAddr(addr)
 		if !ok {
 			continue
 		}
-		links = append(links, fmt.Sprintf("socks5://%s:%s@%s:%d", userConfig["username"], userConfig["password"], server, uint(port)))
+		links = append(links, fmt.Sprintf("socks5://%s@%s:%d", auth, server, uint(port)))
 	}
 	return links
 }
 
 func httpLink(userConfig map[string]interface{}, addrs []map[string]interface{}) []string {
+	user, _ := userConfig["username"].(string)
+	pass, _ := userConfig["password"].(string)
+	auth := url.QueryEscape(user) + ":" + url.QueryEscape(pass)
 	var links []string
 	for _, addr := range addrs {
 		server, port, _, ok := asAddr(addr)
@@ -290,7 +296,7 @@ func httpLink(userConfig map[string]interface{}, addrs []map[string]interface{})
 		if addr["tls"] != nil {
 			protocol = "https"
 		}
-		links = append(links, fmt.Sprintf("%s://%s:%s@%s:%d", protocol, userConfig["username"], userConfig["password"], server, uint(port)))
+		links = append(links, fmt.Sprintf("%s://%s@%s:%d", protocol, auth, server, uint(port)))
 	}
 	return links
 }

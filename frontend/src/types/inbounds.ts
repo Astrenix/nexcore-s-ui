@@ -184,7 +184,7 @@ type InterfaceMap = {
   direct: Direct
   mixed: Mixed
   socks: SOCKS
-  http: SOCKS
+  http: HTTP
   shadowsocks: Shadowsocks
   vmess: VMess
   trojan: Trojan

@@ -19,7 +19,9 @@ const RandomUtil = {
     return Math.floor(random * (max - min + 1) + min)
   },
   randomInt(n: number) {
-    return this.randomIntRange(0, n)
+    // 半开区间 [0, n) — 给数组下标用,n 是数组长度。
+    // 之前用 randomIntRange(0, n) 闭区间会越界(seq[62]=undefined 让密码字面拼出 "undefined")。
+    return this.randomIntRange(0, n - 1)
   },
   randomSeq(count: number): string {
     if (count <= 0) {
