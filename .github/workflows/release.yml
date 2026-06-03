@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository (frontend only)
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
         with:
           submodules: recursive
           fetch-depth: 1
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Download frontend dist
         uses: actions/download-artifact@v8
