@@ -11,7 +11,7 @@ require (
 	github.com/libdns/cloudflare v0.2.2
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sagernet/sing v0.8.9
+	github.com/sagernet/sing v0.8.10
 	github.com/sagernet/sing-box v1.13.11
 	github.com/shirou/gopsutil/v4 v4.26.2
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
