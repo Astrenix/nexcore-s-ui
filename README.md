@@ -1,5 +1,7 @@
 # NexCore s-ui
 
+**简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [繁體中文](README.zh-TW.md)
+
 基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) 二开的 sing-box 节点控制面板,以
 **API 优先 + 自动化部署 + 主控互通**为目标。适合自部署节点服务器,把它接入业务系统/
 代理调度系统作为受控节点;也适合个人单机部署。
