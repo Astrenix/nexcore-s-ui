@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/caddyserver/certmagic v0.25.4
-	github.com/gin-contrib/gzip v1.2.5
+	github.com/gin-contrib/gzip v1.2.6
 	github.com/gin-contrib/sessions v1.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/gofrs/uuid/v5 v5.4.0
