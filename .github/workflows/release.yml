@@ -93,7 +93,7 @@ jobs:
           path: web/html
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           cache: false
           go-version-file: go.mod
