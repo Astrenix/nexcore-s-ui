@@ -95,7 +95,7 @@ func (s *InboundService) GetAll() (*[]map[string]interface{}, error) {
 		inbData["id"] = inbound.Id
 		inbData["type"] = inbound.Type
 		inbData["tag"] = inbound.Tag
-		inbData["tls_id"] = inbound.TlsId
+		inbData["tls_id"] = inbound.TlsIdValue()
 		inbData["enable"] = inbound.Enable
 		// 这三个字段不在 options 里,但前端编辑表单 + 主控对接需要拿全。
 		// 之前 GetAll 只展 options + id/type/tag/tls_id/enable,导致 addrs(多
@@ -183,16 +183,24 @@ func (s *InboundService) Save(tx *gorm.DB, act string, data json.RawMessage, ini
 		if err != nil {
 			return err
 		}
-		if inbound.TlsId > 0 {
-			err = tx.Model(model.Tls{}).Where("id = ?", inbound.TlsId).Find(&inbound.Tls).Error
+		if inbound.HasTls() {
+			err = tx.Model(model.Tls{}).Where("id = ?", inbound.TlsIdValue()).Find(&inbound.Tls).Error
 			if err != nil {
 				return err
 			}
-			// 跟 GetAllConfig 同款兜底:DB 里历史 TLS 记录可能含 sing-box 1.13.5+
-			// 已删的字段(acme.key_type 等),不在这里 sanitize 的话 MarshalJSON
-			// 把脏 server 直接拼进 inboundConfig,corePtr.AddInbound 会被 strict-unmarshal
-			// 拒("unknown field key_type")让 Save 整个失败。
-			if inbound.Tls != nil {
+			// 引用的 TLS 不存在(查不到,Id 仍为 0)→ 降级为"无 TLS":把 tls_id 清成
+			// NULL、关联清空。否则 gorm 的关联保存会把空 &Tls{} upsert 成一条幻影
+			// TLS 记录再挂上去(表现为 tls_id 变成一个新建的空 tls id),既产生垃圾
+			// 数据又绕过了外键的引用完整性意图。正常 UI 只会传 0 或合法 id,这里是
+			// 防御非法/陈旧 tls_id。
+			if inbound.Tls == nil || inbound.Tls.Id == 0 {
+				inbound.TlsId = nil
+				inbound.Tls = nil
+			} else {
+				// 跟 GetAllConfig 同款兜底:DB 里历史 TLS 记录可能含 sing-box 1.13.5+
+				// 已删的字段(acme.key_type 等),不在这里 sanitize 的话 MarshalJSON
+				// 把脏 server 直接拼进 inboundConfig,corePtr.AddInbound 会被 strict-unmarshal
+				// 拒("unknown field key_type")让 Save 整个失败。
 				inbound.Tls.Server = SanitizeRawConfig(inbound.Tls.Server)
 			}
 		}

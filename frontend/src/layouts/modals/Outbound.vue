@@ -12,7 +12,7 @@
     <div class="import-box">
       <div class="import-label">
         <el-icon><Link /></el-icon>
-        从分享链接导入(支持 vmess / vless / trojan / ss / hysteria2 / tuic 等)
+        {{ $t('outbound.importLabel') }}
       </div>
       <el-input
         v-model="link"
@@ -20,13 +20,13 @@
         :rows="2"
         spellcheck="false"
         class="mono-input"
-        placeholder="vless://uuid@host:port?type=tcp...   或者 vmess://eyJ...   或者 trojan://...   或者 ss://..."
+        :placeholder="$t('outbound.importPlaceholder')"
       />
       <div class="import-actions">
         <el-button size="small" type="primary" :disabled="!link.trim() || loading" :loading="loading" @click="linkConvert">
-          解析并填入下面字段
+          {{ $t('outbound.parseAndFill') }}
         </el-button>
-        <span class="hint-muted">导入后请确认 tag / TLS / transport 字段是否符合预期</span>
+        <span class="hint-muted">{{ $t('outbound.importHint') }}</span>
       </div>
     </div>
 
@@ -34,10 +34,10 @@
       <!-- 快速套餐:只在「新增」时显示。一键填全 type+TLS+transport+ALPN+utls 指纹 -->
       <div v-if="title === 'add'" class="quick-presets">
         <span class="quick-presets__label">
-          <el-icon><MagicStick /></el-icon>快速套餐
+          <el-icon><MagicStick /></el-icon>{{ $t('outbound.quickPresets') }}
         </span>
         <el-button size="small" plain @click="applyPreset('vless-vision')">VLESS+Vision+TLS</el-button>
-        <el-button size="small" plain @click="applyPreset('vmess-ws-tls')">VMess+WS+TLS(套 CDN)</el-button>
+        <el-button size="small" plain @click="applyPreset('vmess-ws-tls')">{{ $t('outbound.presetVmessWsTls') }}</el-button>
         <el-button size="small" plain @click="applyPreset('trojan-grpc-tls')">Trojan+gRPC+TLS</el-button>
         <el-button size="small" plain @click="applyPreset('hysteria2')">Hysteria2(QUIC)</el-button>
       </div>
@@ -50,14 +50,14 @@
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('objects.tag')">
-          <el-input v-model="outbound.tag" :disabled="title === 'edit'" placeholder="字母数字 . _ -;路由用此 tag 引用" />
+          <el-input v-model="outbound.tag" :disabled="title === 'edit'" :placeholder="$t('outbound.tagPlaceholder')" />
         </el-form-item>
-        <el-form-item label="中转名称(分享链接 ps 前缀)">
-          <el-input v-model="outbound.display_name" placeholder="如「香港落地」、「东京 BGP」(留空回退到 tag)" />
+        <el-form-item :label="$t('outbound.displayNameLabel')">
+          <el-input v-model="outbound.display_name" :placeholder="$t('outbound.displayNamePlaceholder')" />
         </el-form-item>
         <template v-if="!NoServer.includes(outbound.type)">
           <el-form-item :label="$t('out.addr')">
-            <el-input v-model="outbound.server" placeholder="远端域名或 IP" />
+            <el-input v-model="outbound.server" :placeholder="$t('outbound.serverPlaceholder')" />
           </el-form-item>
           <el-form-item :label="$t('out.port')">
             <el-input-number v-model="outbound.server_port" :min="1" :max="65535" controls-position="right" style="width: 100%" />
@@ -67,11 +67,11 @@
 
       <!-- 凭据(按协议显示对应字段) -->
       <div v-if="hasCredFields" class="form-section">
-        <h4 class="form-section__title">凭据</h4>
+        <h4 class="form-section__title">{{ $t('outbound.creds') }}</h4>
         <div class="form-grid">
           <!-- UUID 类协议 -->
           <el-form-item v-if="['vless','vmess','tuic'].includes(outbound.type)" label="UUID">
-            <el-input v-model="outbound.uuid" placeholder="36 位 UUID" class="mono">
+            <el-input v-model="outbound.uuid" :placeholder="$t('outbound.uuidPlaceholder')" class="mono">
               <template #append>
                 <el-button @click="genUuid"><el-icon><Refresh /></el-icon></el-button>
               </template>
@@ -79,33 +79,33 @@
           </el-form-item>
 
           <!-- 密码类协议 -->
-          <el-form-item v-if="['trojan','tuic','hysteria2','anytls','shadowtls'].includes(outbound.type)" label="密码">
+          <el-form-item v-if="['trojan','tuic','hysteria2','anytls','shadowtls'].includes(outbound.type)" :label="$t('types.pw')">
             <el-input v-model="outbound.password" type="password" show-password autocomplete="new-password" />
           </el-form-item>
 
           <!-- shadowsocks -->
           <template v-if="outbound.type === 'shadowsocks'">
-            <el-form-item label="加密方法">
+            <el-form-item :label="$t('inbound.ssMethod')">
               <el-select v-model="outbound.method" filterable>
                 <el-option v-for="m in SS_METHODS" :key="m" :label="m" :value="m" />
               </el-select>
             </el-form-item>
-            <el-form-item label="密码">
+            <el-form-item :label="$t('types.pw')">
               <el-input v-model="outbound.password" type="password" show-password />
             </el-form-item>
           </template>
 
           <!-- vless flow -->
           <el-form-item v-if="outbound.type === 'vless'" label="Flow">
-            <el-select v-model="outbound.flow" clearable placeholder="不填 = 普通 vless">
-              <el-option label="(空)" value="" />
+            <el-select v-model="outbound.flow" clearable :placeholder="$t('outbound.flowPlaceholder')">
+              <el-option :label="$t('outbound.empty')" value="" />
               <el-option label="xtls-rprx-vision" value="xtls-rprx-vision" />
             </el-select>
           </el-form-item>
 
           <!-- vmess 安全 -->
           <template v-if="outbound.type === 'vmess'">
-            <el-form-item label="加密(security)">
+            <el-form-item :label="$t('outbound.securityLabel')">
               <el-select v-model="outbound.security">
                 <el-option v-for="s in VMESS_SECURITY" :key="s" :label="s" :value="s" />
               </el-select>
@@ -117,13 +117,13 @@
 
           <!-- socks / http / naive 用户名密码可选 -->
           <template v-if="['socks','http','naive'].includes(outbound.type)">
-            <el-form-item label="用户名(可选)">
+            <el-form-item :label="$t('outbound.usernameOptional')">
               <el-input v-model="outbound.username" autocomplete="off" />
             </el-form-item>
-            <el-form-item label="密码(可选)">
+            <el-form-item :label="$t('outbound.passwordOptional')">
               <el-input v-model="outbound.password" type="password" show-password autocomplete="new-password" />
             </el-form-item>
-            <el-form-item v-if="outbound.type === 'socks'" label="SOCKS 版本">
+            <el-form-item v-if="outbound.type === 'socks'" :label="$t('outbound.socksVersion')">
               <el-select v-model="outbound.version">
                 <el-option label="5" value="5" />
                 <el-option label="4a" value="4a" />
@@ -134,19 +134,19 @@
 
           <!-- ssh -->
           <template v-if="outbound.type === 'ssh'">
-            <el-form-item label="用户">
+            <el-form-item :label="$t('outbound.user')">
               <el-input v-model="outbound.user" placeholder="root" />
             </el-form-item>
-            <el-form-item label="密码">
+            <el-form-item :label="$t('types.pw')">
               <el-input v-model="outbound.password" type="password" show-password />
             </el-form-item>
-            <el-form-item label="私钥路径(可选)">
+            <el-form-item :label="$t('outbound.privKeyPath')">
               <el-input v-model="outbound.private_key_path" placeholder="/root/.ssh/id_ed25519" class="mono" />
             </el-form-item>
           </template>
 
           <!-- shadowtls 版本 -->
-          <el-form-item v-if="outbound.type === 'shadowtls'" label="版本">
+          <el-form-item v-if="outbound.type === 'shadowtls'" :label="$t('inbound.version')">
             <el-select v-model="outbound.version">
               <el-option :label="3" :value="3" />
               <el-option :label="2" :value="2" />
@@ -156,10 +156,10 @@
 
           <!-- hysteria 系列 -->
           <template v-if="['hysteria','hysteria2'].includes(outbound.type)">
-            <el-form-item label="上行 Mbps">
+            <el-form-item :label="$t('inbound.upMbps')">
               <el-input-number v-model="outbound.up_mbps" :min="0" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="下行 Mbps">
+            <el-form-item :label="$t('inbound.downMbps')">
               <el-input-number v-model="outbound.down_mbps" :min="0" controls-position="right" style="width: 100%" />
             </el-form-item>
             <el-form-item v-if="outbound.type === 'hysteria'" label="auth_str">
@@ -168,7 +168,7 @@
           </template>
 
           <!-- tuic 拥塞控制 -->
-          <el-form-item v-if="outbound.type === 'tuic'" label="拥塞控制">
+          <el-form-item v-if="outbound.type === 'tuic'" :label="$t('inbound.congestionControl')">
             <el-select v-model="outbound.congestion_control">
               <el-option label="cubic" value="cubic" />
               <el-option label="new_reno" value="new_reno" />
@@ -178,12 +178,12 @@
 
           <!-- selector / urltest 子出站 -->
           <template v-if="['selector','urltest'].includes(outbound.type)">
-            <el-form-item label="子出站(下游 tag,逗号或多选)" class="form-item--full">
-              <el-select v-model="outbound.outbounds" multiple filterable allow-create placeholder="选择或输入">
+            <el-form-item :label="$t('outbound.subOutbounds')" class="form-item--full">
+              <el-select v-model="outbound.outbounds" multiple filterable allow-create :placeholder="$t('outbound.selectOrInput')">
                 <el-option v-for="t in tags" :key="t" :label="t" :value="t" />
               </el-select>
             </el-form-item>
-            <el-form-item v-if="outbound.type === 'urltest'" label="默认出站(测速失败时回退)">
+            <el-form-item v-if="outbound.type === 'urltest'" :label="$t('outbound.defaultOutbound')">
               <el-select v-model="outbound.default" clearable filterable>
                 <el-option v-for="t in tags" :key="t" :label="t" :value="t" />
               </el-select>
@@ -197,22 +197,22 @@
         <div class="form-section__head">
           <div class="form-section__head-left">
             <h4 class="form-section__title">TLS</h4>
-            <p class="form-section__hint">加密层 · VLESS+Vision / Trojan 必开 · VMess 套 CDN 必开 · 裸 VMess/SS 可关</p>
+            <p class="form-section__hint">{{ $t('outbound.tlsHint') }}</p>
           </div>
           <el-switch v-model="tlsEnabled" />
         </div>
         <div v-if="tlsEnabled" class="form-grid">
-          <el-form-item label="SNI(server_name)">
-            <el-input v-model="outbound.tls.server_name" placeholder="留空 = 用 server 字段" />
+          <el-form-item :label="$t('outbound.sniLabel')">
+            <el-input v-model="outbound.tls.server_name" :placeholder="$t('outbound.sniPlaceholder')" />
           </el-form-item>
-          <el-form-item label="ALPN(逗号分隔)">
+          <el-form-item :label="$t('outbound.alpnLabel')">
             <el-input :model-value="(outbound.tls.alpn || []).join(',')" @input="(v: string) => outbound.tls.alpn = v ? v.split(',').map((x) => x.trim()) : []" placeholder="h2,http/1.1" />
           </el-form-item>
-          <el-form-item label="允许不安全(insecure)">
+          <el-form-item :label="$t('tls.ui.allowInsecure')">
             <el-switch v-model="outbound.tls.insecure" />
           </el-form-item>
-          <el-form-item label="uTLS 指纹(伪装)">
-            <el-select v-model="utlsFp" clearable placeholder="不启用">
+          <el-form-item :label="$t('outbound.utlsLabel')">
+            <el-select v-model="utlsFp" clearable :placeholder="$t('tls.ui.notEnabled')">
               <el-option v-for="fp in UTLS_FPS" :key="fp" :label="fp" :value="fp" />
             </el-select>
           </el-form-item>
@@ -220,7 +220,7 @@
 
         <div v-if="tlsEnabled" class="form-subsection">
           <div class="form-subsection__head">
-            <span>Reality(留空 = 不启用)</span>
+            <span>{{ $t('outbound.realityLabel') }}</span>
             <el-switch v-model="realityEnabled" />
           </div>
           <div v-if="realityEnabled" class="form-grid">
@@ -238,14 +238,13 @@
       <div class="form-section">
         <div class="form-section__head">
           <div class="form-section__head-left">
-            <h4 class="form-section__title">传输层(Transport)</h4>
+            <h4 class="form-section__title">{{ $t('inbound.transportLayer') }}</h4>
             <p class="form-section__hint">
-              v2ray 风格的伪装层 — 把代理流量再包一层 WS / gRPC / HTTP,墙看起来就是普通 web。
-              <b>WS+TLS</b> 可套 Cloudflare CDN 隐藏源 IP;<b>gRPC+TLS</b> 走 h2 长连接抗丢包。不开 = 裸 TCP,易被 SNI 阻断。
+              {{ $t('outbound.transportHintA') }}<b>WS+TLS</b>{{ $t('outbound.transportHintB') }}<b>gRPC+TLS</b>{{ $t('outbound.transportHintC') }}
             </p>
           </div>
           <el-select v-if="supportsTransport" v-model="transportType" size="small" style="width: 140px">
-            <el-option label="(裸 TCP)" value="" />
+            <el-option :label="$t('inbound.bareTcp')" value="" />
             <el-option v-for="(v, k) in TrspTypes" :key="k" :label="k" :value="v" />
           </el-select>
         </div>
@@ -253,19 +252,19 @@
         <div v-if="!supportsTransport" class="transport-unsupported">
           <el-icon><InfoFilled /></el-icon>
           <span v-if="['hysteria','hysteria2','tuic'].includes(outbound.type)">
-            <b>{{ outbound.type }}</b> 是 QUIC 协议,传输层已经内置在 QUIC/TLS 1.3 里,不需要额外的 v2ray transport
+            <b>{{ outbound.type }}</b>{{ $t('outbound.transportQuic') }}
           </span>
           <span v-else-if="outbound.type === 'shadowtls'">
-            <b>shadowtls</b> 自身就是一层 TLS 伪装包装,不再叠加 transport
+            <b>shadowtls</b>{{ $t('outbound.transportShadowtls') }}
           </span>
           <span v-else-if="outbound.type === 'naive'">
-            <b>naive</b> 自己用 HTTP/2 + TLS 包装,不需要额外 transport
+            <b>naive</b>{{ $t('outbound.transportNaive') }}
           </span>
           <span v-else-if="['shadowsocks','socks','http','ssh','wireguard'].includes(outbound.type)">
-            <b>{{ outbound.type }}</b> 协议不支持 v2ray transport(sing-box 上游限制)。要套 CDN 请改用 vmess / vless / trojan
+            <b>{{ outbound.type }}</b>{{ $t('outbound.transportUnsupportedProto') }}
           </span>
           <span v-else>
-            该协议类型不支持 v2ray transport
+            {{ $t('outbound.transportUnsupported') }}
           </span>
         </div>
         <div v-if="supportsTransport && transportType" class="form-grid">
@@ -273,7 +272,7 @@
             <el-form-item label="Path">
               <el-input v-model="outbound.transport.path" placeholder="/" class="mono" />
             </el-form-item>
-            <el-form-item label="Host(WS Header)">
+            <el-form-item :label="$t('outbound.wsHostSimple')">
               <el-input :model-value="(outbound.transport.headers || {}).Host" @input="(v: string) => outbound.transport.headers = v ? { Host: v } : undefined" />
             </el-form-item>
           </template>
@@ -286,7 +285,7 @@
             <el-form-item label="Path">
               <el-input v-model="outbound.transport.path" placeholder="/" class="mono" />
             </el-form-item>
-            <el-form-item label="Host(逗号分隔)">
+            <el-form-item :label="$t('inbound.httpHost')">
               <el-input :model-value="(outbound.transport.host || []).join(',')" @input="(v: string) => outbound.transport.host = v ? v.split(',').map((x) => x.trim()) : []" />
             </el-form-item>
           </template>
@@ -304,12 +303,12 @@
       <!-- 高级:JSON 编辑器(逃生通道) -->
       <details class="advanced">
         <summary>
-          <span>高级:完整 JSON</span>
-          <span class="hint-muted">— 上面字段覆盖不到的可以直接改这里</span>
+          <span>{{ $t('inbound.advancedJson') }}</span>
+          <span class="hint-muted">{{ $t('outbound.advancedJsonHint') }}</span>
         </summary>
         <div class="advanced__body">
           <div class="advanced__head">
-            <el-tooltip content="从上面字段重新生成" placement="top">
+            <el-tooltip :content="$t('inbound.regenFromFields')" placement="top">
               <el-button text @click="syncFromJson"><el-icon><RefreshRight /></el-icon></el-button>
             </el-tooltip>
           </div>
@@ -342,6 +341,7 @@ import HttpUtils from '@/plugins/httputil'
 import Data from '@/store/modules/data'
 import { ElMessage } from 'element-plus'
 import { Refresh, RefreshRight, Link, InfoFilled, MagicStick } from '@element-plus/icons-vue'
+import { i18n } from '@/locales'
 
 const props = defineProps<{ visible: boolean; data: string; id: number; tags: string[] }>()
 const emit = defineEmits<{ close: []; 'update:modelValue': [v: boolean] }>()
@@ -522,7 +522,7 @@ const applyPreset = (key: string) => {
       break
   }
   refreshJson()
-  ElMessage.success(`已套用「${key}」预设,补完 server / port / uuid / password 即可保存`)
+  ElMessage.success(i18n.global.t('outbound.presetApplied', { key }))
 }
 
 const genUuid = () => {
@@ -560,7 +560,7 @@ const linkConvert = async () => {
     if (props.id > 0) outbound.value.id = props.id
     link.value = ''
     refreshJson()
-    ElMessage.success('已导入,请检查 tag / TLS / transport 字段')
+    ElMessage.success(i18n.global.t('outbound.imported'))
   }
 }
 

@@ -80,6 +80,14 @@ func probeOne(ctx context.Context, salt string, idx int, n ParsedNode) ProbeOutc
 	out := ProbeOutcome{Node: n}
 	tag := fmt.Sprintf("%s%s_%d", probeTagPrefix, salt, idx)
 
+	// SSRF 防护:节点 server 来自不可信机场订阅,若指向内网/回环/metadata,
+	// 拨号会把面板变成内网端口探测器。直接判 dead,不挂 outbound。
+	if probeTargetBlocked(n.Server) {
+		out.Error = "blocked: internal/unreachable server address"
+		out.Country = detectCountry(n.Remark, "")
+		return out
+	}
+
 	// 构造完整 outbound config(type/tag + options)
 	var optMap map[string]any
 	if err := json.Unmarshal(n.Options, &optMap); err != nil {

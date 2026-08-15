@@ -33,14 +33,14 @@
           </div>
         </el-form>
       </el-tab-pane>
-      <el-tab-pane :label="$t('rule.import.upload', '文件')" name="file">
+      <el-tab-pane :label="$t('rule.import.upload')" name="file">
         <el-upload
           :auto-upload="false"
           :show-file-list="false"
           accept=".json,application/json"
           :on-change="onFileChange"
         >
-          <el-button><el-icon><Upload /></el-icon>{{ $t('rule.import.upload', '选择文件') }}</el-button>
+          <el-button><el-icon><Upload /></el-icon>{{ $t('rule.import.upload') }}</el-button>
         </el-upload>
       </el-tab-pane>
     </el-tabs>

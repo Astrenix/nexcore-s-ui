@@ -3,11 +3,11 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.rules') }}</h2>
-        <p class="page-desc">路由规则、规则集与导入导出 — 不懂可点「一键最佳实践」自动套用机场最优栈;下方所有开关、模板、删除、拖拽切换即保存生效</p>
+        <p class="page-desc">{{ $t('rule.page.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button @click="applyBestPractice">
-          <el-icon><MagicStick /></el-icon>一键最佳实践
+          <el-icon><MagicStick /></el-icon>{{ $t('rule.page.bestPractice') }}
         </el-button>
         <el-button type="primary" @click="showRuleModal(-1)">
           <el-icon><Plus /></el-icon>{{ $t('rule.add') }}
@@ -44,7 +44,7 @@
         </el-dropdown>
         <el-dropdown trigger="click">
           <el-button>
-            <el-icon><Tools /></el-icon>{{ $t('rule.import.title', '导入') }}
+            <el-icon><Tools /></el-icon>{{ $t('rule.import.title') }}
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
@@ -69,28 +69,28 @@
         <div class="form-grid">
           <el-form-item>
             <template #label>
-              <span>默认出站（兜底）</span>
-              <el-tooltip content="所有路由规则都没匹配上时，流量走哪个出站。一般填 direct（直连）或某个代理 outbound 的 tag。" placement="top">
+              <span>{{ $t('rule.page.finalLabel') }}</span>
+              <el-tooltip :content="$t('rule.page.finalTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-select v-model="route.final" clearable filterable placeholder="留空使用 sing-box 默认行为">
+            <el-select v-model="route.final" clearable filterable :placeholder="$t('rule.page.finalPlaceholder')">
               <el-option v-for="t in outboundTags" :key="t" :label="t" :value="t" />
             </el-select>
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>默认网卡</span>
-              <el-tooltip content="出站流量绑定到哪张网卡（如 eth0、en0）。一般留空，让系统自己决定。多网卡服务器才需要指定。" placement="top">
+              <span>{{ $t('rule.page.defaultIfLabel') }}</span>
+              <el-tooltip :content="$t('rule.page.defaultIfTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-input v-model="route.default_interface" clearable placeholder="如 eth0，可留空" />
+            <el-input v-model="route.default_interface" clearable :placeholder="$t('rule.page.defaultIfPlaceholder')" />
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>路由标记（fwmark）</span>
-              <el-tooltip content="Linux 流量打标，配合 iptables / ip rule 做策略路由。0 表示不打标，普通用户保持 0 就行。" placement="top">
+              <span>{{ $t('rule.page.markLabel') }}</span>
+              <el-tooltip :content="$t('rule.page.markTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -98,8 +98,8 @@
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>自动检测默认网卡</span>
-              <el-tooltip content="开启后 sing-box 自动跟随系统默认网卡变化（笔记本切换 Wi-Fi 时也能自动跟上）。服务器场景一般不用开。" placement="top">
+              <span>{{ $t('rule.page.autoDetectLabel') }}</span>
+              <el-tooltip :content="$t('rule.page.autoDetectTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -112,8 +112,8 @@
     <!-- 推荐路由规则 — 开关即用 -->
     <div class="nc-card preset-card">
       <div class="preset-head">
-        <h4 class="section-title">推荐路由规则</h4>
-        <span class="preset-hint">切换即自动保存并热载 sing-box · 需要的规则集会自动注册</span>
+        <h4 class="section-title">{{ $t('rule.page.recRules') }}</h4>
+        <span class="preset-hint">{{ $t('rule.page.toggleAutoSave') }}</span>
       </div>
       <div class="preset-grid">
         <div v-for="p in routeRulePresets" :key="p.key" class="preset-item">
@@ -133,8 +133,8 @@
     <div>
       <div class="nc-divider"><span>{{ $t('rule.ruleset') }} ({{ rulesets.length }})</span></div>
       <div v-if="!rulesets.length" class="empty-state">
-        还没有规则集。规则集是预编译的域名/IP 列表（如「全部国内域名」「广告域名」），路由规则可以直接引用整个规则集，无需手工列域名。<br />
-        点右上角「<b>规则模板</b>」可一键加入常用规则集（屏蔽广告、国内直连、私有地址直连等）。
+        {{ $t('rule.page.emptyRulesets1') }}<br />
+        {{ $t('rule.page.emptyRulesets2a') }}<b>{{ $t('rule.tmpl.title') }}</b>{{ $t('rule.page.emptyRulesets2b') }}
       </div>
       <div v-else class="cards-grid">
         <div v-for="(item, index) in (rulesets as any[])" :key="index" class="entity-card nc-card">
@@ -146,7 +146,7 @@
             <div class="entity-card__row"><dt>{{ $t('ruleset.format') }}</dt><dd class="mono">{{ item.format ?? '—' }}</dd></div>
             <div class="entity-card__row"><dt>{{ $t('objects.outbound') }}</dt><dd class="mono">{{ item.download_detour ?? '—' }}</dd></div>
             <div class="entity-card__row"><dt>{{ $t('actions.update') }}</dt><dd class="mono">{{ item.update_interval ?? '—' }}</dd></div>
-            <div v-if="item.url" class="entity-card__row"><dt>来源</dt><dd class="mono ellipsis" :title="item.url">{{ shortenUrl(item.url) }}</dd></div>
+            <div v-if="item.url" class="entity-card__row"><dt>{{ $t('rule.page.source') }}</dt><dd class="mono ellipsis" :title="item.url">{{ shortenUrl(item.url) }}</dd></div>
           </dl>
           <div class="entity-card__actions">
             <el-tooltip :content="$t('actions.edit')" placement="top">
@@ -169,8 +169,8 @@
     <div>
       <div class="nc-divider"><span>{{ $t('pages.rules') }} ({{ rules.length }})</span></div>
       <div v-if="!rules.length" class="empty-state">
-        还没有路由规则。路由规则决定每个连接走哪个出站（如「国内域名走 direct、其他走代理」「广告域名直接 reject」）。<br />
-        可以用右上角的「<b>规则模板</b>」快速添加常见规则，或点「<b>添加规则</b>」手动编辑。
+        {{ $t('rule.page.emptyRules1') }}<br />
+        {{ $t('rule.page.emptyRules2a') }}<b>{{ $t('rule.tmpl.title') }}</b>{{ $t('rule.page.emptyRules2b') }}<b>{{ $t('rule.add') }}</b>{{ $t('rule.page.emptyRules2c') }}
       </div>
       <div v-else class="cards-grid">
         <div
@@ -190,10 +190,10 @@
             <div class="entity-card__row"><dt>{{ $t('admin.action') }}</dt><dd>{{ item.action ?? '—' }}</dd></div>
             <div class="entity-card__row"><dt>{{ $t('objects.outbound') }}</dt><dd class="mono">{{ item.outbound ?? '—' }}</dd></div>
             <div v-if="Array.isArray(item.rule_set) && item.rule_set.length" class="entity-card__row">
-              <dt>规则集</dt>
+              <dt>{{ $t('rule.ruleset') }}</dt>
               <dd class="mono ellipsis" :title="item.rule_set.join(', ')">{{ item.rule_set.join(', ') }}</dd>
             </div>
-            <div class="entity-card__row"><dt>条件数</dt><dd class="mono">{{ item.rules ? item.rules.length : Object.keys(item).filter((r: string) => !actionKeys.includes(r)).length }}</dd></div>
+            <div class="entity-card__row"><dt>{{ $t('rule.page.conditionCount') }}</dt><dd class="mono">{{ item.rules ? item.rules.length : Object.keys(item).filter((r: string) => !actionKeys.includes(r)).length }}</dd></div>
             <div class="entity-card__row"><dt>{{ $t('rule.invert') }}</dt><dd>{{ $t(item.invert ? 'yes' : 'no') }}</dd></div>
           </dl>
           <div class="entity-card__actions">
@@ -272,11 +272,14 @@ import { i18n } from '@/locales'
 
 const oldConfig = ref({})
 const loading = ref(false)
-const appConfig = computed((): Config => <Config>Data().config)
+// appConfig 是 store.config 的**本地深拷贝**(非引用):编辑/自愈只作用在副本,
+// save 成功才落库。防止未保存的路由编辑污染 Pinia store、被别页整份保存顺带
+// 持久化 + 被轮询覆盖(幽灵保存)。onBeforeMount 在 config 加载完成后深拷贝初始化。
+const appConfig = ref<Config>({} as Config)
 
 // 自检:配置中是否引用了 direct(rule_set 的 download_detour 或路由规则的 outbound)
 const configReferencesDirect = (): boolean => {
-  const cfg = Data().config as any
+  const cfg = appConfig.value as any
   const ruleSets = (cfg?.route?.rule_set as any[]) ?? []
   if (ruleSets.some((rs: any) => rs.download_detour === 'direct')) return true
   const routeRules = (cfg?.route?.rules as any[]) ?? []
@@ -291,9 +294,15 @@ const isDirectOutboundMissing = (): boolean => {
 
 onBeforeMount(async () => {
   loading.value = true
-  while (Data().lastLoad === 0) await new Promise((r) => setTimeout(r, 100))
+  let waited = 0
+  while (Data().lastLoad === 0 && waited < 100) {
+    await new Promise((r) => setTimeout(r, 100))
+    waited++
+  }
+  // 深拷贝到本地副本,之后所有编辑/自愈都作用在 cfg(= appConfig.value)上
+  appConfig.value = JSON.parse(JSON.stringify(Data().config ?? {}))
+  const cfg = appConfig.value as any
   // 防御性兜底:确保 route 对象存在,避免 v-model 双向绑定丢失
-  const cfg = Data().config as any
   if (!cfg.route) cfg.route = { rules: [], rule_set: [] }
   if (!cfg.route.rules) cfg.route.rules = []
   if (!cfg.route.rule_set) cfg.route.rule_set = []
@@ -304,13 +313,13 @@ onBeforeMount(async () => {
   // 1) direct 出站缺失(被 rule_set download_detour 或路由规则 outbound 引用)
   if (configReferencesDirect() && isDirectOutboundMissing()) {
     await Data().save('outbounds', 'new', { type: 'direct', tag: 'direct' })
-    fixed.push('补全 direct 出站')
+    fixed.push(i18n.global.t('rule.fix.addDirect'))
   }
 
   // 2) outbounds 完全为空,sing-box 启动失败
   if (((Data().outbounds as any[]) ?? []).length === 0) {
     await Data().save('outbounds', 'new', { type: 'direct', tag: 'direct' })
-    fixed.push('补全空的 outbounds(至少一个出站)')
+    fixed.push(i18n.global.t('rule.fix.addOutbounds'))
   }
 
   // 3) 路由规则 outbound 引用了不存在的 outbound tag → 清空 outbound 字段(规则保留,走 final)
@@ -324,11 +333,11 @@ onBeforeMount(async () => {
       orphanOutboundCount++
     }
   }
-  if (orphanOutboundCount > 0) fixed.push(`清除 ${orphanOutboundCount} 条规则里的悬空 outbound`)
+  if (orphanOutboundCount > 0) fixed.push(i18n.global.t('rule.fix.clearOrphanOutbound', { n: orphanOutboundCount }))
 
   // 4) route.final 悬空清空
   if (cfg.route.final && !outboundTags.has(cfg.route.final) && !endpointTagsSet.has(cfg.route.final)) {
-    fixed.push(`清除悬空 route.final = ${cfg.route.final}`)
+    fixed.push(i18n.global.t('rule.fix.clearRouteFinal', { val: cfg.route.final }))
     delete cfg.route.final
   }
 
@@ -347,15 +356,19 @@ onBeforeMount(async () => {
       }
     }
   }
-  if (orphanRuleSetCount > 0) fixed.push(`清除 ${orphanRuleSetCount} 条规则里的悬空 rule_set 引用`)
+  if (orphanRuleSetCount > 0) fixed.push(i18n.global.t('rule.fix.clearOrphanRuleSet', { n: orphanRuleSetCount }))
 
   if (fixed.length) {
     const ok = await Data().save('config', 'set', cfg)
-    if (ok) ElMessage.success(`配置已自动修复:${fixed.join(';')} — sing-box 将自动恢复`)
-    else ElMessage.warning(`已修复但保存失败:${fixed.join(';')}`)
+    if (ok) {
+      appConfig.value = JSON.parse(JSON.stringify(Data().config ?? {}))
+      ElMessage.success(i18n.global.t('rule.msg.configFixed', { list: fixed.join(';') }))
+    } else {
+      ElMessage.warning(i18n.global.t('rule.msg.fixedButSaveFailed', { list: fixed.join(';') }))
+    }
   }
 
-  oldConfig.value = JSON.parse(JSON.stringify(Data().config))
+  oldConfig.value = JSON.parse(JSON.stringify(appConfig.value))
   loading.value = false
 })
 
@@ -396,7 +409,7 @@ const autoSave = async (label?: string): Promise<boolean> => {
       }
     }
   }
-  if (cleaned > 0) ElMessage.info(`自动清理 ${cleaned} 条规则的悬空 rule_set 引用`)
+  if (cleaned > 0) ElMessage.info(i18n.global.t('rule.msg.autoCleanRuleSet', { n: cleaned }))
 
   // 4) route.final 悬空 → 清空,sing-box 才不会启动失败
   const outboundTagSet = new Set([
@@ -410,10 +423,10 @@ const autoSave = async (label?: string): Promise<boolean> => {
 
   const success = await Data().save('config', 'set', appConfig.value)
   if (success) {
-    oldConfig.value = JSON.parse(JSON.stringify(Data().config))
+    oldConfig.value = JSON.parse(JSON.stringify(appConfig.value))
     if (label) ElMessage.success(label)
   } else if (label) {
-    ElMessage.error('保存失败,sing-box 未重载,请检查日志')
+    ElMessage.error(i18n.global.t('rule.msg.saveFailed'))
   }
   loading.value = false
   return success
@@ -460,11 +473,11 @@ const saveRuleModal = async (data: any) => {
   if (isNew) rules.value.push(data)
   else rules.value[ruleModal.value.index] = data
   ruleModal.value.visible = false
-  await autoSave(isNew ? '已新增规则并保存' : '已更新规则并保存')
+  await autoSave(isNew ? i18n.global.t('rule.msg.ruleAdded') : i18n.global.t('rule.msg.ruleUpdated'))
 }
 const delRule = async (index: number) => {
   rules.value.splice(index, 1)
-  await autoSave('已删除规则并保存')
+  await autoSave(i18n.global.t('rule.msg.ruleDeleted'))
 }
 
 const rulesetModal = ref({ visible: false, index: -1, data: '' })
@@ -479,7 +492,7 @@ const saveRulesetModal = async (data: ruleset) => {
   if (isNew) rulesets.value.push(data)
   else rulesets.value[rulesetModal.value.index] = data
   rulesetModal.value.visible = false
-  await autoSave(isNew ? '已新增规则集并保存' : '已更新规则集并保存')
+  await autoSave(isNew ? i18n.global.t('rule.msg.rulesetAdded') : i18n.global.t('rule.msg.rulesetUpdated'))
 }
 const delRuleset = async (index: number) => {
   // 删之前先扫一下有没有规则在引用,有就告警(autoSave 的 self-check 会清悬空引用)
@@ -487,9 +500,9 @@ const delRuleset = async (index: number) => {
   const refCount = tag ? (rules.value as any[]).filter((r: any) => Array.isArray(r.rule_set) && r.rule_set.includes(tag)).length : 0
   rulesets.value.splice(index, 1)
   if (refCount > 0) {
-    ElMessage.warning(`${tag} 被 ${refCount} 条规则引用,已自动从这些规则里清除该引用`)
+    ElMessage.warning(i18n.global.t('rule.msg.rulesetRefCleared', { tag, n: refCount }))
   }
-  await autoSave('已删除规则集并保存')
+  await autoSave(i18n.global.t('rule.msg.rulesetDeleted'))
 }
 
 // ---------- 一键路由模板 ----------
@@ -579,7 +592,7 @@ const onDrop = async (index: number) => {
   rules.value.splice(draggedItemIndex.value, 1)
   rules.value.splice(index, 0, dragged)
   draggedItemIndex.value = null
-  await autoSave('已调整规则顺序并保存')
+  await autoSave(i18n.global.t('rule.msg.orderSaved'))
 }
 
 const importRulesModal = ref({ visible: false })
@@ -596,7 +609,7 @@ const saveImportRule = async (block: any, mode: 'merge' | 'replace', applyFinal:
   }
   if (applyFinal && block.final) route.value.final = block.final
   importRulesModal.value.visible = false
-  await autoSave(`已${mode === 'replace' ? '替换' : '合并'}导入规则并保存`)
+  await autoSave(mode === 'replace' ? i18n.global.t('rule.msg.importRulesReplaced') : i18n.global.t('rule.msg.importRulesMerged'))
 }
 
 const importRulesetsModal = ref({ visible: false })
@@ -605,7 +618,7 @@ const closeImportRulesets = () => { importRulesetsModal.value.visible = false }
 const saveImportRulesets = async (items: any[]) => {
   rulesets.value.push(...items)
   importRulesetsModal.value.visible = false
-  await autoSave(`已导入 ${items.length} 个规则集并保存`)
+  await autoSave(i18n.global.t('rule.msg.importRulesetsDone', { n: items.length }))
 }
 
 // ---------- 推荐路由规则（开关即用） ----------
@@ -628,30 +641,30 @@ const SRS_GI = 'https://cdn.jsdelivr.net/gh/SagerNet/sing-geoip@rule-set'
 const routeRulePresets: RoutePreset[] = [
   {
     key: 'sniff',
-    name: '流量嗅探（识别协议）',
-    desc: '识别 TLS SNI / HTTP Host，让基于域名的规则也能匹配 IP 直连请求',
+    name: i18n.global.t('rule.preset.sniffName'),
+    desc: i18n.global.t('rule.preset.sniffDesc'),
     iconText: '👁',
     color: '#7c3aed',
-    badge: '商业机场必开',
+    badge: i18n.global.t('rule.preset.sniffBadge'),
     badgeType: 'success',
     match: (r) => r?.action === 'sniff',
     build: () => ({ action: 'sniff' }),
   },
   {
     key: 'hijack-dns',
-    name: '劫持 53 端口 DNS',
-    desc: '客户端的 DNS 查询交由 sing-box 内部解析。透明代理场景必开',
+    name: i18n.global.t('rule.preset.hijackName'),
+    desc: i18n.global.t('rule.preset.hijackDesc'),
     iconText: '🔌',
     color: '#d97706',
-    badge: '推荐',
+    badge: i18n.global.t('rule.preset.hijackBadge'),
     badgeType: 'success',
     match: (r) => r?.action === 'hijack-dns' && (r?.port === 53 || (Array.isArray(r?.port) && r.port.includes(53))),
     build: () => ({ port: 53, action: 'hijack-dns' }),
   },
   {
     key: 'private-direct',
-    name: '私有地址直连',
-    desc: '192.168.x / 10.x / 172.16.x 等内网地址不走代理',
+    name: i18n.global.t('rule.preset.privateName'),
+    desc: i18n.global.t('rule.preset.privateDesc'),
     iconText: '🏠',
     color: '#10b981',
     match: (r) => r?.outbound === 'direct' && r?.ip_is_private === true,
@@ -659,11 +672,11 @@ const routeRulePresets: RoutePreset[] = [
   },
   {
     key: 'cn-direct',
-    name: '国内域名直连',
-    desc: '匹配 geosite-cn（百度/淘宝/B站等）走 direct，不浪费代理流量',
+    name: i18n.global.t('rule.preset.cnName'),
+    desc: i18n.global.t('rule.preset.cnDesc'),
     iconText: '🇨🇳',
     color: '#dc2626',
-    badge: '商业机场推荐',
+    badge: i18n.global.t('rule.preset.cnBadge'),
     badgeType: 'success',
     ruleSets: [{ tag: 'geosite-cn', url: `${SRS_GS}/geosite-cn.srs` }],
     match: (r) => r?.outbound === 'direct' && Array.isArray(r?.rule_set) && r.rule_set.includes('geosite-cn'),
@@ -671,8 +684,8 @@ const routeRulePresets: RoutePreset[] = [
   },
   {
     key: 'cn-ip-direct',
-    name: '国内 IP 段直连',
-    desc: '匹配 geoip-cn 走 direct，覆盖 DNS 解析失败但 IP 是国内的场景',
+    name: i18n.global.t('rule.preset.cnIpName'),
+    desc: i18n.global.t('rule.preset.cnIpDesc'),
     iconText: '🌐',
     color: '#0ea5e9',
     ruleSets: [{ tag: 'geoip-cn', url: `${SRS_GI}/geoip-cn.srs` }],
@@ -681,8 +694,8 @@ const routeRulePresets: RoutePreset[] = [
   },
   {
     key: 'block-ads',
-    name: '屏蔽广告域名',
-    desc: '匹配 geosite-category-ads-all 直接 reject，给所有用户去广告',
+    name: i18n.global.t('rule.preset.blockAdName'),
+    desc: i18n.global.t('rule.preset.blockAdDesc'),
     iconText: '🚫',
     color: '#475569',
     ruleSets: [{ tag: 'geosite-category-ads-all', url: `${SRS_GS}/geosite-category-ads-all.srs` }],
@@ -691,8 +704,8 @@ const routeRulePresets: RoutePreset[] = [
   },
   {
     key: 'block-tracker',
-    name: '屏蔽追踪器',
-    desc: '匹配 geosite-category-public-tracker 直接 reject',
+    name: i18n.global.t('rule.preset.blockTrackerName'),
+    desc: i18n.global.t('rule.preset.blockTrackerDesc'),
     iconText: '⚠️',
     color: '#f59e0b',
     ruleSets: [{ tag: 'geosite-category-public-tracker', url: `${SRS_GS}/geosite-category-public-tracker.srs` }],
@@ -754,7 +767,7 @@ const togglePreset = async (p: RoutePreset, on: boolean) => {
     const idx = rules.value.findIndex(p.match)
     if (idx >= 0) rules.value.splice(idx, 1)
   }
-  await autoSave(on ? `已启用 ${p.name} 并保存` : `已停用 ${p.name} 并保存`)
+  await autoSave(on ? i18n.global.t('rule.msg.enabledSaved', { name: p.name }) : i18n.global.t('rule.msg.disabledSaved', { name: p.name }))
 }
 
 // 一键最佳实践：商业机场默认开这套(按推荐顺序加,末尾一次性 autoSave)
@@ -770,9 +783,9 @@ const applyBestPractice = async () => {
     if (ok) added++
   }
   if (added > 0) {
-    await autoSave(`已套用商业机场最佳实践:启用 ${added} 条规则(劫持 DNS · 嗅探 · 私有直连 · 国内直连 · 屏蔽广告)并自动保存`)
+    await autoSave(i18n.global.t('rule.msg.bestPracticeApplied', { n: added }))
   } else {
-    ElMessage.info('最佳实践规则已全部启用')
+    ElMessage.info(i18n.global.t('rule.msg.bestPracticeAllEnabled'))
   }
 }
 
@@ -786,12 +799,12 @@ const shortenUrl = (url: string): string => {
 }
 
 const ruleActionLabel = (rule: any): string => {
-  if (rule?.action === 'reject') return '拒绝'
-  if (rule?.action === 'route' || rule?.outbound) return '路由'
-  if (rule?.action === 'sniff') return '嗅探'
-  if (rule?.action === 'hijack-dns') return '劫持 DNS'
-  if (rule?.action === 'resolve') return '解析'
-  return rule?.action ?? '路由'
+  if (rule?.action === 'reject') return i18n.global.t('rule.actionLabel.reject')
+  if (rule?.action === 'route' || rule?.outbound) return i18n.global.t('rule.actionLabel.route')
+  if (rule?.action === 'sniff') return i18n.global.t('rule.actionLabel.sniff')
+  if (rule?.action === 'hijack-dns') return i18n.global.t('rule.actionLabel.hijackDns')
+  if (rule?.action === 'resolve') return i18n.global.t('rule.actionLabel.resolve')
+  return rule?.action ?? i18n.global.t('rule.actionLabel.route')
 }
 
 const ruleActionClass = (rule: any): string => {

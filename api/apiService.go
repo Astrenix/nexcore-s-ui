@@ -301,6 +301,41 @@ func (a *ApiService) PanelSslIssue(c *gin.Context) {
 	}, nil)
 }
 
+// PanelCertInfo 返回面板 HTTPS 证书(webCertFile)的到期信息,给设置页展示。
+func (a *ApiService) PanelCertInfo(c *gin.Context) {
+	certFile := a.tryGet("webCertFile")
+	info := a.PanelSSLService.GetPanelCertInfo(certFile)
+	jsonObj(c, info, nil)
+}
+
+// PanelSslRenew 一键续签面板证书 —— 复用已保存的 webDomain + CF token/email,
+// 前端无需再填任何东西。等价于对已配置域名重跑一次 ACME 签发(Let's Encrypt
+// 允许在到期前重新签,会颁发一张新的 90 天证书),然后异步重启面板加载新证书。
+func (a *ApiService) PanelSslRenew(c *gin.Context) {
+	domain, _ := a.SettingService.GetWebDomain()
+	if domain == "" {
+		jsonMsg(c, "", common.NewError("尚未配置面板域名(webDomain)—— 请先走一次 Cloudflare 一键签发,之后才能续签"))
+		return
+	}
+	token, email := a.SettingService.GetCfToken()
+	if token == "" || email == "" {
+		jsonMsg(c, "", common.NewError("Cloudflare Token / ACME 邮箱未保存 —— 无法自动续签,请重新走一键签发流程"))
+		return
+	}
+	if err := a.PanelSSLService.IssueAndApply(&a.SettingService, &a.CloudflareService, domain, email, token); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	go func() {
+		time.Sleep(2 * time.Second)
+		_ = a.PanelService.RestartPanel(1)
+	}()
+	jsonObj(c, gin.H{
+		"domain": domain,
+		"hint":   "续签成功,2 秒后面板自动重启加载新证书",
+	}, nil)
+}
+
 // tryGet 静默拿单个 setting,失败返回空字符串(供 UI 展示用)
 func (a *ApiService) tryGet(key string) string {
 	if all, err := a.SettingService.GetAllSetting(); err == nil && all != nil {

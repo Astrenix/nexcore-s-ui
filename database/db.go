@@ -86,19 +86,19 @@ func OpenDB(dbPath string) error {
 	if strings.Contains(dbPath, "?") {
 		sep = "&"
 	}
-	// AUDIT.md H1 已回退(v1.7.15):启了 _foreign_keys=on 后,现有 schema 把
-	// inbound.tls_id=0 当 nullable("不绑 TLS")的约定会撞 SQLite FK 校验,
-	// SS / 任何不带 TLS 的入站 Save 全部报 FOREIGN KEY constraint failed。
-	// 要真启 fk 须先把 inbound.tls_id 改 *uint nullable + 数据迁移把现存
-	// 0 改 NULL,改动量大、风险高,这次不做。Service 层已有"tls in use"
-	// 软校验,可控。
+	// _foreign_keys=on(第二轮重新启用):AUDIT.md 第一轮回退过,根因是
+	// inbounds.tls_id 用 0 表示"无 TLS"而 tls 表无 id=0 行,开 FK 后无 TLS 入站
+	// Save 全报 FOREIGN KEY failed。第二轮已把 TlsId 改成 *uint(无 TLS 存 NULL,
+	// FK 对 NULL 不校验),并在 InitDB 里做了存量 0/孤儿 → NULL 的前置迁移,
+	// landmine 消除,现在可安全启用外键:tokens.user_id / inbounds.tls_id 等引用
+	// 完整性由数据库兜底,防止孤儿数据。
 	// _txlock=immediate:让 GORM db.Begin() 走 BEGIN IMMEDIATE,事务一开始就拿
 	// RESERVED 写锁,busy_timeout 才能干净地覆盖等待。默认 DEFERRED 在读升写时
 	// 撞另一个写者会直接 SQLITE_BUSY 不重试,典型表现:"第一次保存 database is
 	// locked,立刻再点就 OK"(SaveStats cron 每 10s 写一次撞了 Save tx 升级)。
 	// _busy_timeout=30000:Save 路径包含 corePtr.AddInbound,sing-box 复杂入站
 	// reload 3-8s,叠加 SaveStats 撞窗口需要更充分缓冲,30s 兜底。
-	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate"
+	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate&_foreign_keys=on"
 	db, err = gorm.Open(sqlite.Open(dsn), c)
 	if err != nil {
 		return err
@@ -131,6 +131,19 @@ func InitDB(dbPath string) error {
 			{Type: "direct", Tag: "direct", Options: json.RawMessage(`{}`)},
 		}
 		db.Create(&defaultOutbound)
+	}
+
+	// 外键前置迁移:历史上 inbounds.tls_id 用 0 表示"无 TLS",但 tls 表没有 id=0
+	// 的行 —— 开启 _foreign_keys=on 后这类行的任何写入都会 FOREIGN KEY 失败
+	// (第一轮因此回退外键)。这里在 AutoMigrate + 任何业务写之前,先把存量的
+	// tls_id=0 以及指向已不存在 tls 的孤儿引用统一清成 NULL(FK 对 NULL 不校验)。
+	// UPDATE 到 NULL 本身合法,即便连接已开 FK 也能安全执行。
+	if db.Migrator().HasTable(&model.Inbound{}) && db.Migrator().HasTable(&model.Tls{}) {
+		if err := db.Exec(
+			"UPDATE inbounds SET tls_id = NULL WHERE tls_id = 0 OR (tls_id IS NOT NULL AND tls_id NOT IN (SELECT id FROM tls))",
+		).Error; err != nil {
+			return err
+		}
 	}
 
 	err = db.AutoMigrate(

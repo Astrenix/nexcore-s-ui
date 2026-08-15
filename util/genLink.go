@@ -49,7 +49,7 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 	}
 
 	var tls map[string]interface{}
-	if i.TlsId > 0 {
+	if i.HasTls() {
 		tls = prepareTls(i.Tls)
 		// 通配符 TLS UX 修复:用户报"导入软件黄色警告"的根因是 server_name
 		// 字段空或本身是通配符 *.x → vmess.sni / vless?sni= 都会传通配符给客户端,
@@ -92,7 +92,7 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 				serverField = strings.TrimSpace(panelIp)
 			}
 		case "tls":
-			if i.TlsId > 0 {
+			if i.HasTls() {
 				if sn, ok := tls["server_name"].(string); ok && sn != "" && !strings.HasPrefix(sn, "*.") {
 					serverField = sn
 				}
@@ -103,14 +103,14 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 			"server_port": (*inbound)["listen_port"],
 			"remark":      baseRemark,
 		})
-		if i.TlsId > 0 {
+		if i.HasTls() {
 			Addrs[0]["tls"] = tls
 		}
 	} else {
 		for index, addr := range Addrs {
 			addrRemark, _ := addr["remark"].(string)
 			Addrs[index]["remark"] = baseRemark + addrRemark
-			if i.TlsId > 0 {
+			if i.HasTls() {
 				newTls := map[string]interface{}{}
 				for k, v := range tls {
 					newTls[k] = v

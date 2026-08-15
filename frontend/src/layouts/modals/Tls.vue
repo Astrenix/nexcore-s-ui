@@ -12,10 +12,10 @@
       <!-- 顶部:名称 + 三个能力开关 -->
       <div class="form-grid">
         <el-form-item :label="$t('client.name')">
-          <el-input v-model="config.name" placeholder="例 tls-cf-auto" />
+          <el-input v-model="config.name" :placeholder="$t('tls.ui.namePlaceholder')" />
         </el-form-item>
         <el-form-item label="SNI · server_name">
-          <el-input v-model="config.server.server_name" placeholder="客户端 ClientHello 里的 SNI" />
+          <el-input v-model="config.server.server_name" :placeholder="$t('tls.ui.sniPlaceholder')" />
         </el-form-item>
       </div>
 
@@ -23,70 +23,70 @@
         <label class="cap-toggle">
           <el-switch v-model="hasAcme" />
           <div>
-            <span class="cap-name">ACME 自动证书</span>
-            <span class="cap-hint">Let's Encrypt 自动签发并续期 — DNS-01 / HTTP-01</span>
+            <span class="cap-name">{{ $t('tls.ui.acmeCapName') }}</span>
+            <span class="cap-hint">{{ $t('tls.ui.acmeCapHint') }}</span>
           </div>
         </label>
         <label class="cap-toggle">
           <el-switch v-model="hasReality" />
           <div>
             <span class="cap-name">Reality</span>
-            <span class="cap-hint">无证书伪装 SNI 转发 — 抗 SNI 阻断 / 主动探测</span>
+            <span class="cap-hint">{{ $t('tls.ui.realityCapHint') }}</span>
           </div>
         </label>
         <label class="cap-toggle">
           <el-switch v-model="hasEch" />
           <div>
             <span class="cap-name">ECH</span>
-            <span class="cap-hint">加密 ClientHello,隐藏真实 SNI(实验性)</span>
+            <span class="cap-hint">{{ $t('tls.ui.echCapHint') }}</span>
           </div>
         </label>
       </div>
 
       <el-tabs v-model="tab" class="tls-tabs">
         <!-- 基础(版本 / ALPN / 证书) -->
-        <el-tab-pane label="基础" name="basic">
+        <el-tab-pane :label="$t('tls.ui.basicTab')" name="basic">
           <div class="form-grid">
-            <el-form-item label="最低 TLS 版本">
-              <el-select v-model="config.server.min_version" clearable placeholder="默认 1.2">
+            <el-form-item :label="$t('tls.ui.minTlsVer')">
+              <el-select v-model="config.server.min_version" clearable :placeholder="$t('tls.ui.defaultVer12')">
                 <el-option v-for="v in TLS_VERSIONS" :key="v" :label="`TLS ${v}`" :value="v" />
               </el-select>
             </el-form-item>
-            <el-form-item label="最高 TLS 版本">
-              <el-select v-model="config.server.max_version" clearable placeholder="默认 1.3">
+            <el-form-item :label="$t('tls.ui.maxTlsVer')">
+              <el-select v-model="config.server.max_version" clearable :placeholder="$t('tls.ui.defaultVer13')">
                 <el-option v-for="v in TLS_VERSIONS" :key="v" :label="`TLS ${v}`" :value="v" />
               </el-select>
             </el-form-item>
-            <el-form-item label="ALPN(逗号分隔,按优先级)" class="form-item--full">
+            <el-form-item :label="$t('tls.ui.alpnLabel')" class="form-item--full">
               <el-input
                 :model-value="(config.server.alpn || []).join(',')"
                 placeholder="h2,http/1.1"
                 @input="(v: string) => config.server.alpn = v ? v.split(',').map((x: string) => x.trim()) : []"
               />
-              <p class="form-hint">VLESS+Vision 通常空;WS / gRPC over TLS 用 <code>h2,http/1.1</code>;Hysteria2 不需要(QUIC 自带)</p>
+              <p class="form-hint">{{ $t('tls.ui.alpnHintA') }}<code>h2,http/1.1</code>{{ $t('tls.ui.alpnHintB') }}</p>
             </el-form-item>
-            <el-form-item label="cipher_suites(高级,逗号分隔)" class="form-item--full">
+            <el-form-item :label="$t('tls.ui.cipherLabel')" class="form-item--full">
               <el-input
                 :model-value="(config.server.cipher_suites || []).join(',')"
-                placeholder="留空 = sing-box 默认"
+                :placeholder="$t('tls.ui.cipherPlaceholder')"
                 @input="(v: string) => config.server.cipher_suites = v ? v.split(',').map((x: string) => x.trim()) : []"
               />
             </el-form-item>
           </div>
 
           <div v-if="!hasAcme && !hasReality" class="form-section">
-            <h4 class="form-section__title">证书(手动指定)</h4>
-            <p class="form-hint">两种方式二选一:① 写绝对路径(推荐) ② 直接粘贴 PEM 内容</p>
+            <h4 class="form-section__title">{{ $t('tls.ui.certManualTitle') }}</h4>
+            <p class="form-hint">{{ $t('tls.ui.certManualHint') }}</p>
             <div class="form-grid">
-              <el-form-item label="证书文件路径">
+              <el-form-item :label="$t('tls.certPath')">
                 <el-input v-model="config.server.certificate_path" class="mono" placeholder="/etc/ssl/example.com.fullchain.pem" />
               </el-form-item>
-              <el-form-item label="私钥文件路径">
+              <el-form-item :label="$t('tls.keyPath')">
                 <el-input v-model="config.server.key_path" class="mono" placeholder="/etc/ssl/example.com.key" />
               </el-form-item>
             </div>
             <div class="cert-inline">
-              <el-form-item label="证书内容(PEM,可多张拼接)">
+              <el-form-item :label="$t('tls.ui.certContentLabel')">
                 <el-input
                   :model-value="(config.server.certificate || []).join('\n')"
                   type="textarea"
@@ -97,7 +97,7 @@
                   @input="(v: string) => config.server.certificate = v ? v.split('\n').filter(Boolean) : []"
                 />
               </el-form-item>
-              <el-form-item label="私钥内容(PEM)">
+              <el-form-item :label="$t('tls.ui.keyContentLabel')">
                 <el-input
                   :model-value="(config.server.key || []).join('\n')"
                   type="textarea"
@@ -115,50 +115,48 @@
         <!-- ACME -->
         <el-tab-pane v-if="hasAcme" label="ACME" name="acme">
           <div class="form-grid">
-            <el-form-item label="域名(逗号分隔,首个为主域)" class="form-item--full">
+            <el-form-item :label="$t('tls.ui.acmeDomainLabel')" class="form-item--full">
               <el-input
                 :model-value="(config.server.acme.domain || []).join(',')"
                 placeholder="api.example.com,*.example.com"
                 @input="(v: string) => config.server.acme.domain = v ? v.split(',').map((x: string) => x.trim()) : []"
               />
               <p v-if="hasWildcardDomain" class="form-hint hint-info">
-                ⓘ 检测到通配符域名。生成的分享链接 <code>sni</code> 字段会自动用入站 tag 替换 <code>*</code>(如
-                <code>vless-15414.example.com</code>),客户端 TLS 校验会通过通配符证书匹配,导入不报黄色警告。
-                链接 <code>server</code>(实际 dial 目标)仍是面板域名/IP,无需对每个子域名单独配 DNS。
+                {{ $t('tls.ui.wildcardHintA') }}<code>sni</code>{{ $t('tls.ui.wildcardHintB') }}<code>*</code>{{ $t('tls.ui.wildcardHintC') }}<code>vless-15414.example.com</code>{{ $t('tls.ui.wildcardHintD') }}<code>server</code>{{ $t('tls.ui.wildcardHintE') }}
               </p>
             </el-form-item>
-            <el-form-item label="联系邮箱">
+            <el-form-item :label="$t('tls.ui.contactEmail')">
               <el-input v-model="config.server.acme.email" placeholder="admin@example.com" />
             </el-form-item>
-            <el-form-item label="ACME 服务商">
-              <el-select v-model="config.server.acme.provider" clearable placeholder="默认 letsencrypt">
-                <el-option label="Let's Encrypt(默认)" value="letsencrypt" />
-                <el-option label="Let's Encrypt Staging(测试)" value="letsencrypt-staging" />
+            <el-form-item :label="$t('tls.ui.acmeProvider')">
+              <el-select v-model="config.server.acme.provider" clearable :placeholder="$t('tls.ui.defaultLetsencrypt')">
+                <el-option :label="$t('tls.ui.providerLE')" value="letsencrypt" />
+                <el-option :label="$t('tls.ui.providerLEStaging')" value="letsencrypt-staging" />
                 <el-option label="ZeroSSL" value="zerossl" />
                 <el-option label="Buypass" value="buypass" />
               </el-select>
             </el-form-item>
-            <el-form-item label="证书数据目录">
-              <el-input v-model="config.server.acme.data_directory" class="mono" placeholder="自动" />
+            <el-form-item :label="$t('tls.ui.certDataDir')">
+              <el-input v-model="config.server.acme.data_directory" class="mono" :placeholder="$t('tls.ui.auto')" />
             </el-form-item>
           </div>
           <div class="form-grid">
-            <el-form-item label="禁用 HTTP-01 挑战">
+            <el-form-item :label="$t('tls.ui.disableHttp01')">
               <el-switch v-model="config.server.acme.disable_http_challenge" />
             </el-form-item>
-            <el-form-item label="禁用 TLS-ALPN 挑战">
+            <el-form-item :label="$t('tls.ui.disableTlsAlpn')">
               <el-switch v-model="config.server.acme.disable_tls_alpn_challenge" />
             </el-form-item>
-            <el-form-item label="HTTP 备用端口">
+            <el-form-item :label="$t('tls.ui.httpAltPort')">
               <el-input-number v-model="config.server.acme.alternative_http_port" :min="0" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="TLS 备用端口">
+            <el-form-item :label="$t('tls.ui.tlsAltPort')">
               <el-input-number v-model="config.server.acme.alternative_tls_port" :min="0" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
           </div>
           <div class="form-section">
-            <h4 class="form-section__title">DNS-01 挑战(可选)</h4>
-            <p class="form-hint">支持泛域名证书。Provider 取 cloudflare / aliyun / dnspod / route53 等;字段名按 sing-box DNS 文档(<code>cloudflare_api_token</code> 等)。</p>
+            <h4 class="form-section__title">{{ $t('tls.ui.dns01Title') }}</h4>
+            <p class="form-hint">{{ $t('tls.ui.dns01HintA') }}<code>cloudflare_api_token</code>{{ $t('tls.ui.dns01HintB') }}</p>
             <el-form-item>
               <el-input
                 :model-value="config.server.acme.dns01_challenge ? JSON.stringify(config.server.acme.dns01_challenge, null, 2) : ''"
@@ -176,32 +174,32 @@
         <!-- Reality -->
         <el-tab-pane v-if="hasReality" label="Reality" name="reality">
           <div class="form-grid">
-            <el-form-item label="握手目标 server(被伪装的 SNI)">
-              <el-input v-model="config.server.reality.handshake.server" placeholder="例 cloud.tencent.com" />
-              <p class="form-hint">必须是真实可达且支持 TLS 1.3 + X25519 的网站</p>
+            <el-form-item :label="$t('tls.ui.realityHandshakeServer')">
+              <el-input v-model="config.server.reality.handshake.server" :placeholder="$t('inbound.handshakeServerPlaceholder')" />
+              <p class="form-hint">{{ $t('tls.ui.realityHandshakeHint') }}</p>
             </el-form-item>
-            <el-form-item label="握手目标端口">
+            <el-form-item :label="$t('inbound.handshakePort')">
               <el-input-number v-model="config.server.reality.handshake.server_port" :min="1" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="Private Key(服务端)">
+            <el-form-item :label="$t('tls.ui.realityPrivKey')">
               <el-input v-model="config.server.reality.private_key" class="mono">
                 <template #append>
-                  <el-button @click="genReality"><el-icon><Refresh /></el-icon>生成</el-button>
+                  <el-button @click="genReality"><el-icon><Refresh /></el-icon>{{ $t('actions.generate') }}</el-button>
                 </template>
               </el-input>
               <p v-if="lastPub" class="form-hint">
-                配套 Public Key(给客户端):<code class="mono select-all">{{ lastPub }}</code>
+                {{ $t('tls.ui.realityPubKeyHint') }}<code class="mono select-all">{{ lastPub }}</code>
               </p>
             </el-form-item>
-            <el-form-item label="Short ID(逗号分隔,可多个)">
+            <el-form-item :label="$t('tls.ui.shortIdLabel')">
               <el-input
                 :model-value="(config.server.reality.short_id || []).join(',')"
-                placeholder="留空 = 任意 short_id"
+                :placeholder="$t('tls.ui.shortIdPlaceholder')"
                 @input="(v: string) => config.server.reality.short_id = v ? v.split(',').map((x: string) => x.trim()) : []"
               />
             </el-form-item>
-            <el-form-item label="最大时间漂移">
-              <el-input v-model="config.server.reality.max_time_difference" placeholder="留空 = 不限" />
+            <el-form-item :label="$t('tls.ui.maxTimeDiff')">
+              <el-input v-model="config.server.reality.max_time_difference" :placeholder="$t('tls.ui.maxTimeDiffPlaceholder')" />
             </el-form-item>
           </div>
         </el-tab-pane>
@@ -209,14 +207,14 @@
         <!-- ECH -->
         <el-tab-pane v-if="hasEch" label="ECH" name="ech">
           <div class="form-grid">
-            <el-form-item label="启用 ECH" class="form-item--full">
+            <el-form-item :label="$t('tls.ui.enableEch')" class="form-item--full">
               <el-switch v-model="config.server.ech.enabled" />
             </el-form-item>
-            <el-form-item label="ECH Key 路径">
+            <el-form-item :label="$t('tls.ui.echKeyPath')">
               <el-input v-model="config.server.ech.key_path" class="mono" placeholder="/etc/sing-box/ech.key" />
             </el-form-item>
           </div>
-          <el-form-item label="ECH Key 内容(PEM)">
+          <el-form-item :label="$t('tls.ui.echKeyContent')">
             <el-input
               :model-value="(config.server.ech.key || []).join('\n')"
               type="textarea"
@@ -229,23 +227,23 @@
         </el-tab-pane>
 
         <!-- 客户端校验(出站引用此 TLS 时拷贝过去) -->
-        <el-tab-pane label="客户端默认值" name="client">
-          <p class="form-hint">这里的值在节点的"分享链接"生成时作为客户端默认参数(SNI / ALPN / utls 指纹)。和上方「基础」的 server 端字段相互独立。</p>
+        <el-tab-pane :label="$t('tls.ui.clientTab')" name="client">
+          <p class="form-hint">{{ $t('tls.ui.clientHint') }}</p>
           <div class="form-grid">
-            <el-form-item label="客户端 SNI(server_name)">
-              <el-input v-model="config.client.server_name" placeholder="留空 = 跟 server 端 SNI" />
+            <el-form-item :label="$t('tls.ui.clientSni')">
+              <el-input v-model="config.client.server_name" :placeholder="$t('tls.ui.clientSniPlaceholder')" />
             </el-form-item>
-            <el-form-item label="允许不安全(insecure)">
+            <el-form-item :label="$t('tls.ui.allowInsecure')">
               <el-switch v-model="config.client.insecure" />
             </el-form-item>
-            <el-form-item label="客户端 ALPN(逗号分隔)" class="form-item--full">
+            <el-form-item :label="$t('tls.ui.clientAlpn')" class="form-item--full">
               <el-input
                 :model-value="(config.client.alpn || []).join(',')"
                 @input="(v: string) => config.client.alpn = v ? v.split(',').map((x: string) => x.trim()) : []"
               />
             </el-form-item>
-            <el-form-item label="uTLS 指纹">
-              <el-select :model-value="config.client.utls?.fingerprint" clearable placeholder="不启用" @change="(v: string) => setUtls(v)">
+            <el-form-item :label="$t('tls.ui.utlsFingerprint')">
+              <el-select :model-value="config.client.utls?.fingerprint" clearable :placeholder="$t('tls.ui.notEnabled')" @change="(v: string) => setUtls(v)">
                 <el-option v-for="fp in UTLS_FPS" :key="fp" :label="fp" :value="fp" />
               </el-select>
             </el-form-item>
@@ -254,7 +252,7 @@
 
         <!-- 高级:JSON -->
         <el-tab-pane label="JSON" name="json">
-          <p class="form-hint">完整 server / client 字段都在这里(包含 fragment / kernel_tx / store 等不在 UI 上的字段)。改 JSON 时上面 tabs 实时同步。</p>
+          <p class="form-hint">{{ $t('tls.ui.jsonHint') }}</p>
           <JsonEditorBlock :data="config" :rows="20" @update:data="(v: any) => (config = v)" />
         </el-tab-pane>
       </el-tabs>

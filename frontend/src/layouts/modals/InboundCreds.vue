@@ -8,7 +8,7 @@
     destroy-on-close
   >
     <template #header>
-      <span>连接凭证 — </span>
+      <span>{{ $t('inboundCreds.title') }}</span>
       <span class="mono creds-tag">{{ inboundTag }}</span>
       <el-tag size="small" type="info" effect="plain" style="margin-left: 8px">{{ inboundType }}</el-tag>
     </template>
@@ -20,51 +20,51 @@
       <!-- 入站元信息 banner -->
       <div class="info-banner">
         <div class="info-banner__field">
-          <span class="info-banner__label">服务器</span>
+          <span class="info-banner__label">{{ $t('dns.server') }}</span>
           <code class="info-banner__value">{{ serverHost }}</code>
         </div>
         <div class="info-banner__field">
-          <span class="info-banner__label">端口</span>
+          <span class="info-banner__label">{{ $t('in.port') }}</span>
           <code class="info-banner__value">{{ listenPort }}</code>
         </div>
         <div class="info-banner__field">
-          <span class="info-banner__label">凭证数</span>
+          <span class="info-banner__label">{{ $t('inboundCreds.credCount') }}</span>
           <code class="info-banner__value">{{ users.length }}</code>
         </div>
         <div class="info-banner__spacer"></div>
         <el-button type="primary" size="small" @click="addOne">
-          <el-icon><Plus /></el-icon>新增凭证
+          <el-icon><Plus /></el-icon>{{ $t('inboundCreds.addCred') }}
         </el-button>
       </div>
 
       <div v-if="!users.length" class="creds-empty">
-        还没有凭证。点上面「新增凭证」生成一对随机用户名/密码,等同新增一个并发账号。
+        {{ $t('inboundCreds.empty') }}
       </div>
 
       <div v-for="(u, i) in users" :key="i" class="cred-card" :class="{ 'is-disabled': !u.enable }">
         <div class="cred-card__head">
           <div class="cred-card__head-left">
             <span class="cred-card__idx">#{{ i + 1 }}</span>
-            <el-tag v-if="!u.enable" type="danger" size="small" effect="plain">已禁用</el-tag>
-            <el-tag v-else-if="isExpired(u)" type="danger" size="small" effect="plain">已到期</el-tag>
-            <el-tag v-else-if="isOverQuota(u)" type="danger" size="small" effect="plain">流量超限</el-tag>
-            <el-tag v-else type="success" size="small" effect="plain">可用</el-tag>
+            <el-tag v-if="!u.enable" type="danger" size="small" effect="plain">{{ $t('inboundCreds.disabled') }}</el-tag>
+            <el-tag v-else-if="isExpired(u)" type="danger" size="small" effect="plain">{{ $t('date.expired') }}</el-tag>
+            <el-tag v-else-if="isOverQuota(u)" type="danger" size="small" effect="plain">{{ $t('inboundCreds.overQuota') }}</el-tag>
+            <el-tag v-else type="success" size="small" effect="plain">{{ $t('inboundCreds.available') }}</el-tag>
           </div>
           <div class="cred-card__head-actions">
-            <el-tooltip content="启用 / 禁用此账号(立即生效)" placement="top">
+            <el-tooltip :content="$t('inboundCreds.toggleTip')" placement="top">
               <el-switch v-model="u.enable" size="small" />
             </el-tooltip>
-            <el-tooltip content="重置 — 重新随机用户名和密码" placement="top">
+            <el-tooltip :content="$t('inboundCreds.resetTip')" placement="top">
               <el-button size="small" plain @click="resetOne(i)">
                 <el-icon><Refresh /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="清零此账号已用流量" placement="top">
+            <el-tooltip :content="$t('inboundCreds.resetUsageTip')" placement="top">
               <el-button size="small" plain @click="resetUsage(u.username)">
                 <el-icon><RefreshLeft /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="删除" placement="top">
+            <el-tooltip :content="$t('actions.del')" placement="top">
               <el-button size="small" plain type="danger" @click="removeOne(i)">
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -73,13 +73,13 @@
         </div>
 
         <div class="cred-row">
-          <span class="cred-row__label">用户名</span>
+          <span class="cred-row__label">{{ $t('types.un') }}</span>
           <el-input v-model="u.username" size="small" class="cred-row__input mono" placeholder="username" />
-          <el-button text size="small" @click="copy(u.username, '用户名')"><el-icon><CopyDocument /></el-icon></el-button>
+          <el-button text size="small" @click="copy(u.username, $t('types.un'))"><el-icon><CopyDocument /></el-icon></el-button>
         </div>
 
         <div class="cred-row">
-          <span class="cred-row__label">密码</span>
+          <span class="cred-row__label">{{ $t('types.pw') }}</span>
           <el-input
             v-model="u.password"
             size="small"
@@ -90,19 +90,19 @@
           <el-button text size="small" @click="shown[i] = !shown[i]">
             <el-icon><View v-if="!shown[i]" /><Hide v-else /></el-icon>
           </el-button>
-          <el-button text size="small" @click="copy(u.password, '密码')"><el-icon><CopyDocument /></el-icon></el-button>
+          <el-button text size="small" @click="copy(u.password, $t('types.pw'))"><el-icon><CopyDocument /></el-icon></el-button>
         </div>
 
         <div class="cred-row">
-          <span class="cred-row__label">连接 URI</span>
+          <span class="cred-row__label">{{ $t('inboundCreds.connUri') }}</span>
           <code class="cred-uri mono">{{ uriOf(u) }}</code>
-          <el-button text size="small" @click="copy(uriOf(u), '连接 URI')"><el-icon><CopyDocument /></el-icon></el-button>
+          <el-button text size="small" @click="copy(uriOf(u), $t('inboundCreds.connUri'))"><el-icon><CopyDocument /></el-icon></el-button>
         </div>
 
         <!-- 限制与用量 -->
         <div class="cred-limits">
           <div class="cred-limits__row">
-            <span class="cred-row__label">流量限制</span>
+            <span class="cred-row__label">{{ $t('inboundCreds.volumeLimit') }}</span>
             <el-input-number
               v-model="u.volume_limit_gb"
               :min="0"
@@ -112,21 +112,21 @@
               controls-position="right"
               class="limit-num"
             />
-            <span class="limit-unit">GB(0 = 不限)</span>
+            <span class="limit-unit">{{ $t('inboundCreds.gbUnlimited') }}</span>
             <span class="limit-spacer"></span>
-            <span class="cred-row__label">到期</span>
+            <span class="cred-row__label">{{ $t('date.expiry') }}</span>
             <el-date-picker
               v-model="u.expiry_date"
               type="datetime"
               size="small"
-              placeholder="留空 = 永久"
+              :placeholder="$t('inboundCreds.expiryPlaceholder')"
               value-format="x"
               class="limit-date"
             />
           </div>
           <div v-if="u.volume_limit_gb > 0 || u.expiry_date" class="cred-limits__progress">
             <div v-if="u.volume_limit_gb > 0" class="usage-bar">
-              <span class="usage-bar__label">已用 {{ formatBytes(u.used) }} / {{ u.volume_limit_gb }} GB</span>
+              <span class="usage-bar__label">{{ $t('inboundCreds.used') }} {{ formatBytes(u.used) }} / {{ u.volume_limit_gb }} GB</span>
               <el-progress
                 :percentage="usagePct(u)"
                 :status="usagePct(u) >= 100 ? 'exception' : usagePct(u) >= 80 ? 'warning' : 'success'"
@@ -143,10 +143,10 @@
     </div>
 
     <template #footer>
-      <span v-if="dirty" class="dirty-hint">有未保存修改</span>
-      <el-button @click="onClose">关闭</el-button>
+      <span v-if="dirty" class="dirty-hint">{{ $t('inboundCreds.unsaved') }}</span>
+      <el-button @click="onClose">{{ $t('actions.close') }}</el-button>
       <el-button type="primary" :loading="saving" :disabled="loading || !dirty" @click="onSave">
-        保存修改
+        {{ $t('inboundCreds.saveChanges') }}
       </el-button>
     </template>
   </el-dialog>
@@ -160,6 +160,7 @@ import RandomUtil from '@/plugins/randomUtil'
 import { HumanReadable } from '@/plugins/utils'
 import { ElMessage } from 'element-plus'
 import { Loading, Plus, CopyDocument, Refresh, RefreshLeft, Delete, View, Hide } from '@element-plus/icons-vue'
+import { i18n } from '@/locales'
 
 interface CredEntry {
   username: string
@@ -247,7 +248,7 @@ const resetUsage = async (username: string) => {
   if (!username) return
   const r = await HttpUtils.post('api/resetTraffic', { resource: 'user', tag: username })
   if (r.success) {
-    ElMessage.success(`已清零 ${username} 的流量统计`)
+    ElMessage.success(i18n.global.t('inboundCreds.usageReset', { name: username }))
     const u = users.value.find((x) => x.username === username)
     if (u) u.used = 0
   }
@@ -256,9 +257,9 @@ const resetUsage = async (username: string) => {
 const copy = async (text: string, label: string) => {
   try {
     await navigator.clipboard.writeText(text)
-    ElMessage.success(`已复制${label}`)
+    ElMessage.success(i18n.global.t('inboundCreds.copied', { label }))
   } catch {
-    ElMessage.warning('剪贴板权限被拒,请手动复制')
+    ElMessage.warning(i18n.global.t('inboundCreds.clipboardDenied'))
   }
 }
 
@@ -292,21 +293,21 @@ const expiryLabel = (u: CredEntry) => {
   const d = new Date(u.expiry_date)
   const expired = u.expiry_date < Date.now()
   const fmt = d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-  return expired ? `已于 ${fmt} 到期` : `到期:${fmt}`
+  return expired ? i18n.global.t('inboundCreds.expiredAt', { date: fmt }) : i18n.global.t('inboundCreds.expiresAt', { date: fmt })
 }
 
 const onSave = async () => {
   if (!fullInbound.value) return
   for (const u of users.value) {
     if (!u.username.trim()) {
-      ElMessage.error('用户名不能为空')
+      ElMessage.error(i18n.global.t('inboundCreds.unameEmpty'))
       return
     }
   }
   const seen = new Set<string>()
   for (const u of users.value) {
     if (seen.has(u.username)) {
-      ElMessage.error(`用户名重复:${u.username}`)
+      ElMessage.error(i18n.global.t('inboundCreds.unameDup', { name: u.username }))
       return
     }
     seen.add(u.username)
@@ -328,7 +329,7 @@ const onSave = async () => {
 
     const ok = await Data().save('inbounds', 'edit', fullInbound.value)
     if (ok) {
-      ElMessage.success(`${props.inboundTag} 凭证已保存(${users.value.length} 组),sing-box 已热重载`)
+      ElMessage.success(i18n.global.t('inboundCreds.saved', { tag: props.inboundTag, n: users.value.length }))
       initialJson.value = JSON.stringify(stripUsed(users.value))
       onClose()
     }

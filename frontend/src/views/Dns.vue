@@ -3,11 +3,11 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.dns') }}</h2>
-        <p class="page-desc">DNS 服务器、规则与策略 — 不懂可直接点「一键推荐参数」自动套用机场最优栈;下方所有开关切换即保存生效</p>
+        <p class="page-desc">{{ $t('dns.page.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button @click="applyRecommendedParams">
-          <el-icon><MagicStick /></el-icon>一键推荐参数
+          <el-icon><MagicStick /></el-icon>{{ $t('dns.page.recommendParams') }}
         </el-button>
         <el-button @click="showDnsModal(-1)">
           <el-icon><Plus /></el-icon>{{ $t('dns.add') }}
@@ -24,8 +24,8 @@
     <!-- 推荐 DNS 服务器 — 开关即用 -->
     <div class="nc-card preset-card">
       <div class="preset-head">
-        <h4 class="section-title">推荐 DNS 服务器</h4>
-        <span class="preset-hint">切换即自动保存并热载 sing-box</span>
+        <h4 class="section-title">{{ $t('dns.page.recServers') }}</h4>
+        <span class="preset-hint">{{ $t('dns.page.toggleAutoSave') }}</span>
       </div>
       <div class="preset-grid">
         <div v-for="p in serverPresets" :key="p.tag" class="preset-item">
@@ -46,8 +46,8 @@
     <!-- 推荐 DNS 规则 — 开关即用 -->
     <div class="nc-card preset-card">
       <div class="preset-head">
-        <h4 class="section-title">推荐 DNS 规则</h4>
-        <span class="preset-hint">切换即自动保存并热载 sing-box</span>
+        <h4 class="section-title">{{ $t('dns.page.recRules') }}</h4>
+        <span class="preset-hint">{{ $t('dns.page.toggleAutoSave') }}</span>
       </div>
       <div class="preset-grid">
         <div v-for="p in rulePresets" :key="p.key" class="preset-item">
@@ -59,7 +59,7 @@
             </div>
             <div class="preset-item__desc">{{ p.desc }}</div>
             <div v-if="p.requires && !p.requires.every((t) => isServerEnabled(t))" class="preset-item__warn">
-              ⚠ 需先启用：{{ p.requires.filter((t) => !isServerEnabled(t)).join('、') }}
+              {{ $t('dns.page.needEnable', { list: p.requires.filter((t) => !isServerEnabled(t)).join('、') }) }}
             </div>
           </div>
           <el-switch :model-value="isRuleEnabled(p.key)" :disabled="p.requires && !p.requires.every((t) => isServerEnabled(t))" @change="(v) => toggleRule(p, v)" />
@@ -69,54 +69,54 @@
 
     <!-- 基础参数 -->
     <div class="nc-card">
-      <h4 class="section-title">基础参数</h4>
+      <h4 class="section-title">{{ $t('dns.page.baseParams') }}</h4>
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item>
             <template #label>
-              <span>兜底 DNS</span>
-              <el-tooltip content="所有规则都没匹配上时使用的 DNS。建议设为国外 DoH，避免污染。" placement="top">
+              <span>{{ $t('dns.page.finalDnsLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.finalDnsTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-select v-model="finalDns" clearable placeholder="留空使用第一个服务器">
+            <el-select v-model="finalDns" clearable :placeholder="$t('dns.page.finalDnsPlaceholder')">
               <el-option :label="$t('dns.firstServer')" value="" />
               <el-option v-for="t in dnsServerTags" :key="t" :label="t" :value="t" />
             </el-select>
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>解析优先级</span>
-              <el-tooltip content="prefer_ipv4：优先 v4，国内最稳。ipv4_only：完全不查 v6，避免落地机 v6 不通导致超时。" placement="top">
+              <span>{{ $t('dns.page.strategyLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.strategyTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-select v-model="dns.strategy" clearable placeholder="推荐 prefer_ipv4">
+            <el-select v-model="dns.strategy" clearable :placeholder="$t('dns.page.strategyPlaceholder')">
               <el-option v-for="s in ['prefer_ipv4', 'prefer_ipv6', 'ipv4_only', 'ipv6_only']" :key="s" :label="s" :value="s" />
             </el-select>
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>客户端子网（EDNS）</span>
-              <el-tooltip content="把「客户端大致位置」告诉权威 DNS，让 CDN 返回更近的节点。一般留空；做流媒体解锁时填落地机所在国家 IP 段。" placement="top">
+              <span>{{ $t('dns.page.clientSubnetLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.clientSubnetTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-input v-model="dns.client_subnet" clearable placeholder="如 1.0.1.0/24，可留空" />
+            <el-input v-model="dns.client_subnet" clearable :placeholder="$t('dns.page.clientSubnetPlaceholder')" />
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>缓存条数</span>
-              <el-tooltip content="缓存可大幅减少 DNS 查询。商业机场推荐 4096 起步。" placement="top">
+              <span>{{ $t('dns.page.cacheCountLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.cacheCountTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
-            <el-input-number v-model="dns.cache_capacity" :min="0" controls-position="right" placeholder="推荐 4096" style="width: 100%" />
+            <el-input-number v-model="dns.cache_capacity" :min="0" controls-position="right" :placeholder="$t('dns.page.cacheCountPlaceholder')" style="width: 100%" />
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>关闭缓存</span>
-              <el-tooltip content="开启后每次都重新查询，落地机 CPU 压力大，不推荐。" placement="top">
+              <span>{{ $t('dns.page.disableCacheLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.disableCacheTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -124,8 +124,8 @@
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>缓存永不过期</span>
-              <el-tooltip content="忽略 TTL，缓存永远有效。除非你确定上游 IP 不会变，否则别开。" placement="top">
+              <span>{{ $t('dns.page.disableExpireLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.disableExpireTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -133,8 +133,8 @@
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>各服务器独立缓存</span>
-              <el-tooltip content="国内 DNS 与国外 DNS 缓存隔离，避免污染串味。做分流时强烈建议开启。" placement="top">
+              <span>{{ $t('dns.page.independentCacheLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.independentCacheTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -142,8 +142,8 @@
           </el-form-item>
           <el-form-item>
             <template #label>
-              <span>反向映射（IP→域名）</span>
-              <el-tooltip content="缓存「IP 来自哪个域名」，路由按域名匹配时性能更好。商业场景建议开。" placement="top">
+              <span>{{ $t('dns.page.reverseMappingLabel') }}</span>
+              <el-tooltip :content="$t('dns.page.reverseMappingTip')" placement="top">
                 <el-icon class="label-tip"><QuestionFilled /></el-icon>
               </el-tooltip>
             </template>
@@ -156,7 +156,7 @@
     <div>
       <div class="nc-divider"><span>{{ $t('dns.title') }} ({{ dns.servers?.length ?? 0 }})</span></div>
       <div v-if="!dns.servers?.length" class="empty-state">
-        还没有 DNS 服务器。可在上方「推荐 DNS 服务器」打开任意开关，或点右上角「添加 DNS 服务器」手动配置。
+        {{ $t('dns.page.emptyServers') }}
       </div>
       <div v-else class="cards-grid">
         <div v-for="(item, index) in (dns.servers as any[])" :key="index" class="entity-card nc-card">
@@ -194,7 +194,7 @@
     <div>
       <div class="nc-divider"><span>{{ $t('dns.rule.title') }} ({{ dnsRules.length }})</span></div>
       <div v-if="!dnsRules.length" class="empty-state">
-        还没有 DNS 规则。规则用于把不同域名分流到不同 DNS 服务器（如国内域名走阿里、国外走 Cloudflare）。可在上方「推荐 DNS 规则」启用。
+        {{ $t('dns.page.emptyRules') }}
       </div>
       <div v-else class="cards-grid">
         <div
@@ -258,6 +258,7 @@
 import Data from '@/store/modules/data'
 import { computed, ref, onBeforeMount, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
+import { i18n } from '@/locales'
 
 const DnsVue = defineAsyncComponent(() => import('@/layouts/modals/Dns.vue'))
 const DnsRuleVue = defineAsyncComponent(() => import('@/layouts/modals/DnsRule.vue'))
@@ -268,7 +269,11 @@ import { Plus, Edit, Delete, Check, MagicStick, QuestionFilled } from '@element-
 
 const oldConfig = ref<any>({})
 const loading = ref(false)
-const appConfig = computed((): Config => <Config>Data().config)
+// appConfig 是 store.config 的**本地深拷贝**,不是直接引用。编辑 / 自愈都作用在
+// 副本上,只有 save 成功后才落库;避免"未保存的 DNS 编辑污染 Pinia store,被别页
+// 的整份保存顺带持久化 + 被 10s 轮询静默覆盖"(幽灵保存)。onBeforeMount 里在
+// config 加载完成后深拷贝初始化。
+const appConfig = ref<Config>({} as Config)
 
 // 扫描 DNS 规则里缺失的 rule_set 依赖，返回未注册的依赖项
 const scanMissingRuleSets = (): RulesetDep[] => {
@@ -304,12 +309,18 @@ const configReferencesDirect = (): boolean => {
 }
 
 onBeforeMount(async () => {
+  loading.value = true
+  // 先等 config 加载完成(带最大重试,避免 lastLoad 永远为 0 时死等)
+  let waited = 0
+  while (Data().lastLoad === 0 && waited < 100) {
+    await new Promise((r) => setTimeout(r, 100))
+    waited++
+  }
+  // 深拷贝到本地副本 —— 之后所有编辑 / 自愈都在副本上
+  appConfig.value = JSON.parse(JSON.stringify(Data().config ?? {}))
   if (!appConfig.value.dns) appConfig.value.dns = { servers: [], rules: [] }
   if (!appConfig.value.dns.servers) appConfig.value.dns.servers = []
   if (!appConfig.value.dns.rules) appConfig.value.dns.rules = []
-
-  loading.value = true
-  while (Data().lastLoad === 0) await new Promise((r) => setTimeout(r, 100))
 
   // 全面自检与自愈 — 解决 sing-box 启动报错四大类:
   // 1) DNS 规则引用的 rule_set 没注册到 route.rule_set
@@ -320,13 +331,13 @@ onBeforeMount(async () => {
 
   if (configReferencesDirect() && isDirectOutboundMissing()) {
     await Data().save('outbounds', 'new', { type: 'direct', tag: 'direct' })
-    fixed.push('补全 direct 出站')
+    fixed.push(i18n.global.t('dns.fix.addDirect'))
   }
 
   // 兜底:outbounds 完全为空时 sing-box 启动会失败,自动加一个 direct
   if (((Data().outbounds as any[]) ?? []).length === 0) {
     await Data().save('outbounds', 'new', { type: 'direct', tag: 'direct' })
-    fixed.push('补全空的 outbounds(至少需要一个出站)')
+    fixed.push(i18n.global.t('dns.fix.addOutbounds'))
   }
 
   // 检测:是否有 DNS 服务器引用了 domain_resolver='dns-local' 但 dns-local 不存在
@@ -335,19 +346,19 @@ onBeforeMount(async () => {
   const refsDnsLocal = dnsServers.some((s: any) => s.domain_resolver === 'dns-local')
   if (refsDnsLocal && !hasDnsLocal) {
     appConfig.value.dns!.servers!.unshift({ type: 'local', tag: 'dns-local' } as any)
-    fixed.push('补全 dns-local 服务器(DoH 自身域名解析所需)')
+    fixed.push(i18n.global.t('dns.fix.addDnsLocal'))
   }
 
   const missing = scanMissingRuleSets()
   if (missing.length) {
     await ensureRuleSet(missing)
-    fixed.push(`补全 rule_set: ${missing.map((d) => d.tag).join('、')}`)
+    fixed.push(i18n.global.t('dns.fix.addRuleSet', { list: missing.map((d) => d.tag).join('、') }))
   }
 
   // 清理悬空引用:dns.final / route.final / DNS 规则的 server 字段指向不存在的 tag
   const dnsServerTagSet = new Set(dnsServers.map((s: any) => s.tag).filter(Boolean))
   if (appConfig.value.dns?.final && !dnsServerTagSet.has(appConfig.value.dns.final)) {
-    fixed.push(`清除悬空 dns.final = ${appConfig.value.dns.final}`)
+    fixed.push(i18n.global.t('dns.fix.clearDnsFinal', { val: appConfig.value.dns.final }))
     appConfig.value.dns.final = undefined
   }
 
@@ -365,26 +376,30 @@ onBeforeMount(async () => {
     for (let j = orphanRuleIdx.length - 1; j >= 0; j--) {
       dnsRulesArr.splice(orphanRuleIdx[j], 1)
     }
-    fixed.push(`删除 ${orphanRuleIdx.length} 条引用了不存在 server 的 DNS 规则`)
+    fixed.push(i18n.global.t('dns.fix.delOrphanRules', { n: orphanRuleIdx.length }))
   }
   const outboundTagSet = new Set(((Data().outbounds as any[]) ?? []).map((o: any) => o.tag).filter(Boolean))
   // direct 出站若被自动补,这一轮 outbounds 数据还没刷新,把 direct 也算入
   if (configReferencesDirect()) outboundTagSet.add('direct')
   if (appConfig.value.route?.final && !outboundTagSet.has(appConfig.value.route.final)) {
-    fixed.push(`清除悬空 route.final = ${appConfig.value.route.final}`)
+    fixed.push(i18n.global.t('dns.fix.clearRouteFinal', { val: appConfig.value.route.final }))
     ;(appConfig.value.route as any).final = undefined
   }
 
   if (fixed.length) {
     const success = await Data().save('config', 'set', appConfig.value)
     if (success) {
-      ElMessage.success(`配置已自动修复:${fixed.join(';')} — sing-box 将自动恢复`)
+      // 保存成功:副本重新同步后端规范化结果
+      appConfig.value = JSON.parse(JSON.stringify(Data().config ?? {}))
+      ElMessage.success(i18n.global.t('dns.msg.configFixed', { list: fixed.join(';') }))
     } else {
-      ElMessage.warning(`已自动修复:${fixed.join(';')},但保存失败,请手动点保存`)
+      // 保存失败:保留副本里的本地修复,让用户手动点保存
+      ElMessage.warning(i18n.global.t('dns.msg.fixedButSaveFailed', { list: fixed.join(';') }))
     }
   }
 
-  oldConfig.value = JSON.parse(JSON.stringify(Data().config))
+  // 快照统一以当前副本为基准(保存失败时能正确显示"有未保存修复")
+  oldConfig.value = JSON.parse(JSON.stringify(appConfig.value))
   loading.value = false
 })
 
@@ -407,10 +422,11 @@ const autoSave = async (label?: string): Promise<boolean> => {
   }
   const success = await Data().save('config', 'set', appConfig.value)
   if (success) {
-    oldConfig.value = JSON.parse(JSON.stringify(Data().config))
+    // 快照当前副本(不重新拉 store,避免后端规范化让编辑中的表单跳变)
+    oldConfig.value = JSON.parse(JSON.stringify(appConfig.value))
     if (label) ElMessage.success(label)
   } else if (label) {
-    ElMessage.error('保存失败,sing-box 未重载,请检查日志')
+    ElMessage.error(i18n.global.t('dns.msg.saveFailed'))
   }
   loading.value = false
   return success
@@ -448,18 +464,18 @@ const serverPresets: ServerPreset[] = [
   {
     tag: 'dns-cf',
     name: 'Cloudflare DoH',
-    desc: '国外域名首选 · 防污染 · 全球速度快',
+    desc: i18n.global.t('dns.presetServer.cfDesc'),
     display: 'https://1.1.1.1/dns-query',
     iconText: 'CF',
     color: '#f6821f',
-    badge: '推荐',
+    badge: i18n.global.t('dns.presetServer.cfBadge'),
     badgeType: 'success',
     build: () => ({ type: 'https', tag: 'dns-cf', server: '1.1.1.1', server_port: 443, domain_resolver: 'dns-local' }),
   },
   {
     tag: 'dns-google',
     name: 'Google DoH',
-    desc: '国外域名备用 · 与 Cloudflare 互补',
+    desc: i18n.global.t('dns.presetServer.googleDesc'),
     display: 'https://8.8.8.8/dns-query',
     iconText: 'G',
     color: '#4285f4',
@@ -467,30 +483,30 @@ const serverPresets: ServerPreset[] = [
   },
   {
     tag: 'dns-ali',
-    name: '阿里 DoH',
-    desc: '国内域名解析 · 国内 CDN 调度准',
+    name: i18n.global.t('dns.presetServer.aliName'),
+    desc: i18n.global.t('dns.presetServer.aliDesc'),
     display: 'https://dns.alidns.com/dns-query',
-    iconText: '阿',
+    iconText: i18n.global.t('dns.presetServer.aliIcon'),
     color: '#ff6a00',
-    badge: '国内',
+    badge: i18n.global.t('dns.presetServer.aliBadge'),
     badgeType: 'warning',
     build: () => ({ type: 'https', tag: 'dns-ali', server: 'dns.alidns.com', server_port: 443, domain_resolver: 'dns-local' }),
   },
   {
     tag: 'dns-dnspod',
     name: 'DNSPod DoH',
-    desc: '国内备用 · 腾讯系',
+    desc: i18n.global.t('dns.presetServer.dnspodDesc'),
     display: 'https://doh.pub/dns-query',
-    iconText: '腾',
+    iconText: i18n.global.t('dns.presetServer.dnspodIcon'),
     color: '#00a4ff',
-    badge: '国内',
+    badge: i18n.global.t('dns.presetServer.dnspodBadge'),
     badgeType: 'warning',
     build: () => ({ type: 'https', tag: 'dns-dnspod', server: 'doh.pub', server_port: 443, domain_resolver: 'dns-local' }),
   },
   {
     tag: 'dns-local',
-    name: '本地系统 DNS',
-    desc: '使用落地机系统配置的解析器（一般不用单独开）',
+    name: i18n.global.t('dns.presetServer.localName'),
+    desc: i18n.global.t('dns.presetServer.localDesc'),
     display: 'local',
     iconText: 'L',
     color: '#94a3b8',
@@ -535,12 +551,12 @@ const toggleServer = async (p: ServerPreset, on: boolean) => {
       if (stillNeeded) {
         // 自动加回 dns-local,避免破坏 DoH 服务器
         dns.value.servers.unshift({ type: 'local', tag: 'dns-local' })
-        ElMessage.warning('其它 DoH 服务器仍依赖 dns-local,已自动保留')
+        ElMessage.warning(i18n.global.t('dns.msg.keepDnsLocal'))
       }
     }
-    if (cascadeKeys.length) ElMessage.info(`级联关闭依赖规则:${cascadeKeys.join('、')}`)
+    if (cascadeKeys.length) ElMessage.info(i18n.global.t('dns.msg.cascadeOff', { list: cascadeKeys.join('、') }))
   }
-  await autoSave(on ? `已启用 ${p.name} 并保存` : `已停用 ${p.name} 并保存`)
+  await autoSave(on ? i18n.global.t('dns.msg.enabledSaved', { name: p.name }) : i18n.global.t('dns.msg.disabledSaved', { name: p.name }))
 }
 
 // ---------- 推荐 DNS 规则（开关即用） ----------
@@ -567,11 +583,11 @@ type RulePreset = {
 const rulePresets: RulePreset[] = [
   {
     key: 'cn-to-ali',
-    name: '国内域名走阿里 DNS',
-    desc: '匹配 geosite-cn 时使用 dns-ali 解析（避免国外 DNS 给国内 CDN 调度错地方）',
+    name: i18n.global.t('dns.presetRule.cnToAliName'),
+    desc: i18n.global.t('dns.presetRule.cnToAliDesc'),
     iconText: '🇨🇳',
     color: '#dc2626',
-    badge: '商业机场推荐',
+    badge: i18n.global.t('dns.presetRule.cnToAliBadge'),
     badgeType: 'success',
     requires: ['dns-ali'],
     ruleSets: [{ tag: 'geosite-cn', url: `${SRS_GEOSITE}/geosite-cn.srs` }],
@@ -580,8 +596,8 @@ const rulePresets: RulePreset[] = [
   },
   {
     key: 'cn-ip-to-ali',
-    name: '国内 IP 段走阿里 DNS',
-    desc: '匹配 geoip-cn 时使用 dns-ali 解析',
+    name: i18n.global.t('dns.presetRule.cnIpToAliName'),
+    desc: i18n.global.t('dns.presetRule.cnIpToAliDesc'),
     iconText: '🌐',
     color: '#0ea5e9',
     requires: ['dns-ali'],
@@ -591,19 +607,19 @@ const rulePresets: RulePreset[] = [
   },
   {
     key: 'reject-private',
-    name: '拒绝解析私有地址',
-    desc: '⚠ sing-box 1.13 已知冲突:开启后 rule_set 下载会被 reject 导致核心起不来。如要防 DNS 重绑定,改去路由层加 ip_cidr 黑名单。',
+    name: i18n.global.t('dns.presetRule.rejectPrivateName'),
+    desc: i18n.global.t('dns.presetRule.rejectPrivateDesc'),
     iconText: '⚠',
     color: '#94a3b8',
-    badge: '不推荐',
+    badge: i18n.global.t('dns.presetRule.rejectPrivateBadge'),
     badgeType: 'warning',
     match: (r: any) => r?.action === 'reject' && r?.ip_is_private === true,
     build: () => ({ ip_is_private: true, action: 'reject' }),
   },
   {
     key: 'block-ad',
-    name: '屏蔽广告域名',
-    desc: '匹配 geosite-category-ads-all 时直接拒绝',
+    name: i18n.global.t('dns.presetRule.blockAdName'),
+    desc: i18n.global.t('dns.presetRule.blockAdDesc'),
     iconText: '🚫',
     color: '#475569',
     ruleSets: [{ tag: 'geosite-category-ads-all', url: `${SRS_GEOSITE}/geosite-category-ads-all.srs` }],
@@ -656,7 +672,7 @@ const toggleRule = async (p: RulePreset, on: boolean) => {
     if (idx >= 0) dns.value.rules.splice(idx, 1)
     // rule_set 资源保留不删 — 可能被其他地方引用，由用户在「路由列表」手动清理
   }
-  await autoSave(on ? `已启用规则「${p.name}」并保存` : `已停用规则「${p.name}」并保存`)
+  await autoSave(on ? i18n.global.t('dns.msg.ruleEnabledSaved', { name: p.name }) : i18n.global.t('dns.msg.ruleDisabledSaved', { name: p.name }))
 }
 
 // ---------- 一键推荐参数 ----------
@@ -696,7 +712,7 @@ const applyRecommendedParams = async () => {
   if (!dns.value.final) dns.value.final = 'dns-cf'
 
   // 4. 落库 + sing-box 重载
-  await autoSave('已套用机场最优 DNS 栈并自动保存:Cloudflare + 阿里 DoH · 国内域名走阿里 · 缓存 4096 · sing-box 已重载')
+  await autoSave(i18n.global.t('dns.msg.recommendedApplied'))
 }
 
 // ---------- 自定义 modal 编辑 ----------
@@ -711,14 +727,14 @@ const saveDnsModal = async (data: any) => {
   if (dnsModal.value.index === -1) dns.value.servers.push(data)
   else dns.value.servers[dnsModal.value.index] = data
   dnsModal.value.visible = false
-  await autoSave(dnsModal.value.index === -1 ? '已新增 DNS 服务器并保存' : '已更新 DNS 服务器并保存')
+  await autoSave(dnsModal.value.index === -1 ? i18n.global.t('dns.msg.serverAdded') : i18n.global.t('dns.msg.serverUpdated'))
 }
 const delDns = async (index: number) => {
   const tag = dns.value.servers[index]?.tag
   dns.value.servers.splice(index, 1)
   // final 指向被删的服务器时清空,否则 sing-box 启动失败
   if (tag && dns.value.final === tag) dns.value.final = undefined
-  await autoSave('已删除 DNS 服务器并保存')
+  await autoSave(i18n.global.t('dns.msg.serverDeleted'))
 }
 
 const dnsRuleModal = ref({ visible: false, index: -1, data: '' })
@@ -732,11 +748,11 @@ const saveDnsRuleModal = async (data: dnsRule) => {
   if (dnsRuleModal.value.index === -1) dnsRules.value.push(data)
   else dnsRules.value[dnsRuleModal.value.index] = data
   dnsRuleModal.value.visible = false
-  await autoSave(dnsRuleModal.value.index === -1 ? '已新增 DNS 规则并保存' : '已更新 DNS 规则并保存')
+  await autoSave(dnsRuleModal.value.index === -1 ? i18n.global.t('dns.msg.ruleAdded') : i18n.global.t('dns.msg.ruleUpdated'))
 }
 const delDnsRule = async (index: number) => {
   dnsRules.value.splice(index, 1)
-  await autoSave('已删除 DNS 规则并保存')
+  await autoSave(i18n.global.t('dns.msg.ruleDeleted'))
 }
 
 const draggedItemIndex = ref<number | null>(null)
@@ -747,7 +763,7 @@ const onDrop = async (index: number) => {
     dnsRules.value.splice(draggedItemIndex.value, 1)
     dnsRules.value.splice(index, 0, dragged)
     draggedItemIndex.value = null
-    await autoSave('已调整规则顺序并保存')
+    await autoSave(i18n.global.t('dns.msg.orderSaved'))
   }
 }
 </script>

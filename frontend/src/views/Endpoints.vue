@@ -3,14 +3,14 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.endpoints') }}</h2>
-        <p class="page-desc">虚拟网卡端点 · 用于让落地机加入 Cloudflare Warp / Tailscale / 自建 WireGuard 网络（与「出站管理」不同 — 这里建的是网卡，不是简单转发）</p>
+        <p class="page-desc">{{ $t('endpoints.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button :loading="warpLoading" @click="quickRegisterWarp">
-          <el-icon v-if="!warpLoading"><MagicStick /></el-icon>一键 Warp
+          <el-icon v-if="!warpLoading"><MagicStick /></el-icon>{{ $t('endpoints.quickWarp') }}
         </el-button>
         <el-button @click="addTailscaleTemplate">
-          <el-icon><Connection /></el-icon>一键 Tailscale
+          <el-icon><Connection /></el-icon>{{ $t('endpoints.quickTailscale') }}
         </el-button>
         <el-button type="primary" @click="showModal(0)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
@@ -20,28 +20,28 @@
 
     <!-- 用途说明卡片（只在还没配端点时显示） -->
     <div v-if="endpoints.length === 0" class="nc-card guide-card">
-      <h4 class="section-title">这个页面是干啥的</h4>
+      <h4 class="section-title">{{ $t('endpoints.whatIsThis') }}</h4>
       <div class="guide-grid">
         <div class="guide-item">
           <div class="guide-item__icon" style="background: #f6821f">⚡</div>
-          <div class="guide-item__title">解锁流媒体 / ChatGPT</div>
-          <div class="guide-item__desc">落地机 IP 被 Netflix / OpenAI 拉黑时，加一个 <b>Cloudflare Warp</b> 端点，把这些域名的流量从 Cloudflare 出去，立刻解锁。</div>
-          <el-button size="small" type="primary" plain :loading="warpLoading" @click="quickRegisterWarp">配 Warp →</el-button>
+          <div class="guide-item__title">{{ $t('endpoints.guide1Title') }}</div>
+          <div class="guide-item__desc">{{ $t('endpoints.guide1DescA') }}<b>Cloudflare Warp</b>{{ $t('endpoints.guide1DescB') }}</div>
+          <el-button size="small" type="primary" plain :loading="warpLoading" @click="quickRegisterWarp">{{ $t('endpoints.setupWarp') }}</el-button>
         </div>
         <div class="guide-item">
           <div class="guide-item__icon" style="background: #2563eb">🌐</div>
-          <div class="guide-item__title">多机房节点互联</div>
-          <div class="guide-item__desc">把分散在不同 IDC 的机场节点用 <b>Tailscale</b> 组成虚拟内网，统一管理。</div>
-          <el-button size="small" plain @click="addTailscaleTemplate">配 Tailscale →</el-button>
+          <div class="guide-item__title">{{ $t('endpoints.guide2Title') }}</div>
+          <div class="guide-item__desc">{{ $t('endpoints.guide2DescA') }}<b>Tailscale</b>{{ $t('endpoints.guide2DescB') }}</div>
+          <el-button size="small" plain @click="addTailscaleTemplate">{{ $t('endpoints.setupTailscale') }}</el-button>
         </div>
         <div class="guide-item">
           <div class="guide-item__icon" style="background: #7c3aed">🔐</div>
-          <div class="guide-item__title">连自建 WG 落地</div>
-          <div class="guide-item__desc">你自己有 WireGuard 服务端，把机场服务器变成中转入口，二级跳到自家落地。</div>
-          <el-button size="small" plain @click="showModal(0)">手动配 WG →</el-button>
+          <div class="guide-item__title">{{ $t('endpoints.guide3Title') }}</div>
+          <div class="guide-item__desc">{{ $t('endpoints.guide3Desc') }}</div>
+          <el-button size="small" plain @click="showModal(0)">{{ $t('endpoints.setupWg') }}</el-button>
         </div>
       </div>
-      <div class="guide-tip">💡 99% 的小机场用不到这一页 — 只在「IP 被识别」「跨机房组网」时才需要。商业机场最常用：<b>一键 Warp</b> 解锁 ChatGPT/Netflix。</div>
+      <div class="guide-tip">{{ $t('endpoints.guideTipA') }}<b>{{ $t('endpoints.quickWarp') }}</b>{{ $t('endpoints.guideTipB') }}</div>
     </div>
 
     <div v-else class="cards-grid">
@@ -84,7 +84,7 @@
               </el-button>
             </template>
           </el-popconfirm>
-          <el-tooltip v-if="item.type == 'wireguard' && item.peers?.length > 0" :content="$t('main.qr', 'QR')" placement="top">
+          <el-tooltip v-if="item.type == 'wireguard' && item.peers?.length > 0" :content="$t('main.qr')" placement="top">
             <el-button text @click="showQrCode(item.id)"><el-icon><Picture /></el-icon></el-button>
           </el-tooltip>
           <el-tooltip v-if="Data().enableTraffic" :content="$t('stats.graphTitle')" placement="top">
@@ -113,6 +113,7 @@ import Data from '@/store/modules/data'
 import { Endpoint } from '@/types/endpoints'
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { i18n } from '@/locales'
 
 const EndpointVue = defineAsyncComponent(() => import('@/layouts/modals/Endpoint.vue'))
 const Stats = defineAsyncComponent(() => import('@/layouts/modals/Stats.vue'))
@@ -163,7 +164,7 @@ const quickRegisterWarp = async () => {
     type: 'info',
     duration: 0,
     showClose: false,
-    message: `正在向 Cloudflare 注册 Warp 账号…标签 ${tag}`,
+    message: i18n.global.t('endpoints.warpRegistering', { tag }),
   })
   try {
     const ok = await Data().save('endpoints', 'new', {
@@ -176,9 +177,9 @@ const quickRegisterWarp = async () => {
       peers: [{ address: '', port: 0, public_key: '' }],
     })
     if (ok) {
-      ElMessage.success(`Warp 注册成功！端点 "${tag}" 已自动配好 — 可在「路由列表」把 ChatGPT/Claude/Netflix 流量导到此端点`)
+      ElMessage.success(i18n.global.t('endpoints.warpSuccess', { tag }))
     } else {
-      ElMessage.error('Warp 注册失败 — 检查落地机能否访问 api.cloudflareclient.com（部分 IDC 被墙不通）')
+      ElMessage.error(i18n.global.t('endpoints.warpFailed'))
     }
   } finally {
     tip.close()
@@ -201,7 +202,7 @@ const addTailscaleTemplate = () => {
     accept_routes: true,
   })
   modal.value.visible = true
-  ElMessage.info('已生成 Tailscale 模板,请在弹窗中填入 auth_key 后保存')
+  ElMessage.info(i18n.global.t('endpoints.tailscaleTemplate'))
 }
 </script>
 

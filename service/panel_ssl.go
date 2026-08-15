@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,68 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/cloudflare"
 )
+
+// PanelCertInfo 面板 HTTPS 证书的到期信息,给设置页展示 + 决定是否该续签。
+type PanelCertInfo struct {
+	Configured bool     `json:"configured"`           // 是否配置了 webCertFile
+	Domains    []string `json:"domains,omitempty"`    // 证书覆盖的域名(CN + SAN)
+	Issuer     string   `json:"issuer,omitempty"`     // 签发机构 CN
+	NotBefore  int64    `json:"notBefore,omitempty"`  // 生效时间(unix)
+	NotAfter   int64    `json:"notAfter,omitempty"`   // 到期时间(unix)
+	DaysLeft   int      `json:"daysLeft"`             // 距到期天数(已过期为负)
+	Expired    bool     `json:"expired"`              // 是否已过期
+	Error      string   `json:"error,omitempty"`      // 读取/解析失败原因
+}
+
+// GetPanelCertInfo 读取 webCertFile 指向的证书链,解析首个叶子证书的到期信息。
+// 不做任何写操作,纯只读展示。文件缺失/非法只在结果里带 Error,不返回硬错误
+// (设置页仍要能正常渲染)。
+func (s *PanelSSLService) GetPanelCertInfo(certFile string) PanelCertInfo {
+	if strings.TrimSpace(certFile) == "" {
+		return PanelCertInfo{Configured: false}
+	}
+	info := PanelCertInfo{Configured: true}
+	pemData, err := os.ReadFile(certFile)
+	if err != nil {
+		info.Error = "读取证书文件失败: " + err.Error()
+		return info
+	}
+	// 证书链里可能有多段 PEM,第一段 CERTIFICATE 是叶子证书(面板域名的那张)
+	var leaf *x509.Certificate
+	rest := pemData
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, perr := x509.ParseCertificate(block.Bytes)
+		if perr != nil {
+			continue
+		}
+		leaf = cert
+		break
+	}
+	if leaf == nil {
+		info.Error = "证书文件里没有可解析的 CERTIFICATE 块"
+		return info
+	}
+
+	domains := leaf.DNSNames
+	if len(domains) == 0 && leaf.Subject.CommonName != "" {
+		domains = []string{leaf.Subject.CommonName}
+	}
+	info.Domains = domains
+	info.Issuer = leaf.Issuer.CommonName
+	info.NotBefore = leaf.NotBefore.Unix()
+	info.NotAfter = leaf.NotAfter.Unix()
+	info.DaysLeft = int(time.Until(leaf.NotAfter).Hours() / 24)
+	info.Expired = time.Now().After(leaf.NotAfter)
+	return info
+}
 
 // PanelSSLDir 是面板自己用的 ACME 证书存储根。certmagic FileStorage 会在
 // 这下面生成 certificates/<issuer>/<domain>/<domain>.{crt,key,json}。

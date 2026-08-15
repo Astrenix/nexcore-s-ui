@@ -3,17 +3,17 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.outbounds') }}</h2>
-        <p class="page-desc">{{ $t('outbounds.desc', '配置出站协议与连通性测试') }}</p>
+        <p class="page-desc">{{ $t('outbounds.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button type="primary" @click="showModal(0)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
         </el-button>
         <el-button :loading="testingAll" :disabled="outbounds.length === 0" @click="checkAllOutbounds">
-          <el-icon><Stopwatch /></el-icon>{{ $t('actions.testAll', '测试全部') }}
+          <el-icon><Stopwatch /></el-icon>{{ $t('actions.testAll') }}
         </el-button>
         <el-button :loading="refreshing" @click="refresh">
-          <el-icon><RefreshRight /></el-icon>{{ $t('actions.refresh', '刷新') }}
+          <el-icon><RefreshRight /></el-icon>{{ $t('actions.refresh') }}
         </el-button>
       </div>
     </div>
@@ -21,41 +21,41 @@
     <div class="ob-toolbar nc-card">
       <el-input
         v-model="filter"
-        :placeholder="$t('actions.search', '搜索 tag / 类型 / 地址')"
+        :placeholder="$t('actions.search')"
         clearable
         class="ob-toolbar__search"
       >
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <div class="ob-toolbar__stats">
-        <span class="ob-stat"><span class="ob-stat__num">{{ outbounds.length }}</span>{{ $t('outbounds.total', '出站') }}</span>
+        <span class="ob-stat"><span class="ob-stat__num">{{ outbounds.length }}</span>{{ $t('outbounds.total') }}</span>
         <span v-if="passCount > 0" class="ob-stat ob-stat--ok">
-          <el-icon><CircleCheck /></el-icon>{{ passCount }} {{ $t('outbounds.pass', '通') }}
+          <el-icon><CircleCheck /></el-icon>{{ passCount }} {{ $t('outbounds.pass') }}
         </span>
         <span v-if="failCount > 0" class="ob-stat ob-stat--err">
-          <el-icon><CircleClose /></el-icon>{{ failCount }} {{ $t('outbounds.fail', '不通') }}
+          <el-icon><CircleClose /></el-icon>{{ failCount }} {{ $t('outbounds.fail') }}
         </span>
         <span v-if="hiddenSysCount > 0" class="ob-stat ob-stat--muted">
-          已隐藏 {{ hiddenSysCount }} 个系统出站
+          {{ $t('outbounds.hiddenSys', { n: hiddenSysCount }) }}
         </span>
-        <el-tooltip placement="top" :content="autoProbe ? `每 ${PROBE_INTERVAL_MS / 1000}s 自动探测可见出站延迟与在线状态;下一轮 ${nextProbeIn}s` : '点开关启用自动探测'">
+        <el-tooltip placement="top" :content="autoProbe ? $t('outbounds.autoProbeOn', { interval: PROBE_INTERVAL_MS / 1000, next: nextProbeIn }) : $t('outbounds.autoProbeOff')">
           <span class="ob-stat ob-stat--switch">
             <el-switch v-model="autoProbe" size="small" />
-            <span style="margin-left: 6px">自动探测</span>
+            <span style="margin-left: 6px">{{ $t('outbounds.autoProbe') }}</span>
             <span v-if="autoProbe" class="ob-probe-tick mono">{{ nextProbeIn }}s</span>
           </span>
         </el-tooltip>
-        <el-tooltip placement="top" content="direct / block / dns 是面板自动补的内置出口,被路由直连规则和规则集下载隐式引用,删了 sing-box 启动失败。默认隐藏让列表只显示真正的代理节点。">
+        <el-tooltip placement="top" :content="$t('outbounds.sysOutboundTip')">
           <span class="ob-stat ob-stat--switch">
             <el-switch v-model="showSystem" size="small" />
-            <span style="margin-left: 6px">显示系统出站</span>
+            <span style="margin-left: 6px">{{ $t('outbounds.showSysOutbound') }}</span>
           </span>
         </el-tooltip>
       </div>
     </div>
 
     <div v-if="outbounds.length === 0" class="empty-state nc-card">
-      <el-empty :description="$t('noData', '暂无数据')">
+      <el-empty :description="$t('noData')">
         <el-button type="primary" @click="showModal(0)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
         </el-button>
@@ -83,7 +83,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="中转名称" min-width="160" show-overflow-tooltip>
+      <el-table-column :label="$t('outbounds.relayName')" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">
           <span v-if="row.display_name" class="ob-display-name">{{ row.display_name }}</span>
           <span v-else class="ob-muted">—</span>
@@ -118,7 +118,7 @@
           <!-- 整个 cell 可点 = 重测;loading 时禁点。原"测试"按钮收编进延迟值,
                腾出操作列空间给真正的操作 -->
           <el-tooltip
-            :content="checkResults[row.tag]?.loading ? '探测中…' : (checkResults[row.tag]?.errorMessage || '点击重测')"
+            :content="checkResults[row.tag]?.loading ? $t('inbounds.probing') : (checkResults[row.tag]?.errorMessage || $t('outbounds.clickRetest'))"
             placement="top"
           >
             <span class="delay-cell" :class="{ 'is-clickable': !checkResults[row.tag]?.loading }" @click="!checkResults[row.tag]?.loading && checkOutbound(row.tag)">
@@ -144,7 +144,7 @@
       <el-table-column :label="$t('actions.action')" width="140" align="center">
         <template #default="{ row }">
           <div class="ob-actions">
-            <el-tooltip v-if="Data().enableTraffic" :content="$t('stats.graphTitle', '流量图')" placement="top">
+            <el-tooltip v-if="Data().enableTraffic" :content="$t('stats.graphTitle')" placement="top">
               <el-button text size="small" @click="showStats(row.tag)">
                 <el-icon><DataLine /></el-icon>
               </el-button>

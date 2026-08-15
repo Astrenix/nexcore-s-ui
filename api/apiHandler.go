@@ -83,6 +83,8 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.CFIssueTLS(c)
 	case "panelSslIssue":
 		a.ApiService.PanelSslIssue(c)
+	case "panelSslRenew":
+		a.ApiService.PanelSslRenew(c)
 	case "subSave":
 		a.ApiService.ApiSubSave(c)
 	case "subDelete":
@@ -140,6 +142,8 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetTokens(c)
 	case "firewallStatus":
 		a.ApiService.GetFirewallStatus(c)
+	case "panelCertInfo":
+		a.ApiService.PanelCertInfo(c)
 	case "cfCredentials":
 		a.ApiService.GetCfCredentials(c)
 	case "cfDetectIp":

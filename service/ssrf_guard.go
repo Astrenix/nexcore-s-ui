@@ -80,6 +80,32 @@ func ssrfSafeDialContext(timeout time.Duration) func(ctx context.Context, networ
 	}
 }
 
+// probeTargetBlocked 校验订阅节点的拨号目标(server 可能是 IP 或域名)是否指向
+// 内网/回环/metadata。订阅探测会把每个节点挂成 outbound 并拨号,若节点 server
+// 来自恶意机场订阅指向受害面板内网(如 10.0.0.5:6379),就能借 alive/last_error
+// 差异对内网做端口探测。域名先解析,任一解析结果落内网即拒绝。
+// 解析失败视为不可达(阻断),让这类节点直接判 dead。
+func probeTargetBlocked(server string) bool {
+	if server == "" {
+		return true
+	}
+	if ip := net.ParseIP(server); ip != nil {
+		return isBlockedIP(ip)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, server)
+	if err != nil || len(ips) == 0 {
+		return true
+	}
+	for _, ipAddr := range ips {
+		if isBlockedIP(ipAddr.IP) {
+			return true
+		}
+	}
+	return false
+}
+
 // newSSRFSafeClient 构造一个仅允许访问公网 http/https 的 client。
 func newSSRFSafeClient(timeout time.Duration) *http.Client {
 	transport := &http.Transport{

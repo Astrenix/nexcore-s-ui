@@ -3,7 +3,7 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.settings') }}</h2>
-        <p class="page-desc">{{ $t('settings.desc', '面板访问与账号设置') }}</p>
+        <p class="page-desc">{{ $t('settings.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button
@@ -31,25 +31,25 @@
         <el-tab-pane :label="$t('setting.interface')" name="t1">
           <el-form label-position="top" class="settings-form">
             <div class="settings-grid">
-              <el-form-item label="节点名称(侧边栏显示)">
-                <el-input v-model="settings.nodeName" placeholder="如「香港-1 BGP」、「东京 PCCW」(留空不显示)" />
+              <el-form-item :label="$t('setting.ui.nodeName')">
+                <el-input v-model="settings.nodeName" :placeholder="$t('setting.ui.nodeNamePlaceholder')" />
               </el-form-item>
-              <el-form-item label="分享链接 server 字段来源(全局)" class="form-item--full">
+              <el-form-item :label="$t('setting.ui.addrSourceLabel')" class="form-item--full">
                 <el-radio-group v-model="settings.linkAddrSource">
-                  <el-radio value="panel">面板域名(推荐,可走 CDN)</el-radio>
-                  <el-radio value="ip">服务器 IP</el-radio>
-                  <el-radio value="tls">TLS 证书域名(server_name)</el-radio>
+                  <el-radio value="panel">{{ $t('setting.ui.addrPanel') }}</el-radio>
+                  <el-radio value="ip">{{ $t('inbounds.addrSrc.ip') }}</el-radio>
+                  <el-radio value="tls">{{ $t('setting.ui.addrTls') }}</el-radio>
                 </el-radio-group>
                 <p class="form-hint">
-                  vmess / vless 等分享链接里 <code class="mono">add</code> 字段(客户端 dial 的目标)从哪里来:<br>
-                  <b>面板域名</b> — 用 panel 域名(开了 CF 小黄云就走 CDN,大陆抗封首选);<br>
-                  <b>服务器 IP</b> — 用下方 <code class="mono">服务器公网 IP</code> 字段,raw TCP 协议(anytls / shadowsocks / vmess+tcp 等不能透 CDN)的中转出站要用这个;<br>
-                  <b>TLS server_name</b> — 用入站证书签的域名(每入站独立,需要每个 server_name 都有 DNS A 记录)。<br>
-                  入站编辑里可以单独覆盖此全局值。
+                  {{ $t('setting.ui.addrHint1') }}<code class="mono">add</code>{{ $t('setting.ui.addrHint2') }}<br>
+                  <b>{{ $t('inbounds.addrSrc.panel') }}</b>{{ $t('setting.ui.addrHint3') }}<br>
+                  <b>{{ $t('inbounds.addrSrc.ip') }}</b>{{ $t('setting.ui.addrHint4') }}<code class="mono">{{ $t('setting.ui.panelIp') }}</code>{{ $t('setting.ui.addrHint5') }}<br>
+                  <b>TLS server_name</b>{{ $t('setting.ui.addrHint6') }}<br>
+                  {{ $t('setting.ui.addrHint7') }}
                 </p>
               </el-form-item>
-              <el-form-item v-if="settings.linkAddrSource === 'ip'" label="服务器公网 IP" class="form-item--full">
-                <el-input v-model="settings.panelIp" placeholder="如 47.85.19.31(留空 fallback 到面板域名)" />
+              <el-form-item v-if="settings.linkAddrSource === 'ip'" :label="$t('setting.ui.panelIp')" class="form-item--full">
+                <el-input v-model="settings.panelIp" :placeholder="$t('setting.ui.panelIpPlaceholder')" />
               </el-form-item>
               <el-form-item :label="$t('setting.addr')">
                 <el-input v-model="settings.webListen" />
@@ -69,14 +69,46 @@
               <el-form-item :label="$t('setting.sslCert')">
                 <el-input v-model="settings.webCertFile" />
               </el-form-item>
+              <!-- 证书状态:到期时间 + 剩余天数 + 一键续签 -->
+              <el-form-item :label="$t('setting.sslStatus')" class="form-item--full">
+                <div v-loading="certLoading" class="cert-status">
+                  <template v-if="certInfo && certInfo.configured && !certInfo.error">
+                    <div class="cert-status__row">
+                      <el-tag :type="certStatusType" effect="dark" size="small">
+                        <span v-if="certInfo.expired">{{ $t('setting.sslExpired') }}</span>
+                        <span v-else>{{ $t('setting.sslDaysLeft', { n: certInfo.daysLeft }) }}</span>
+                      </el-tag>
+                      <el-button
+                        type="primary"
+                        size="small"
+                        :loading="renewing"
+                        @click="renewSsl"
+                      >
+                        {{ $t('setting.sslRenew') }}
+                      </el-button>
+                    </div>
+                    <div class="cert-status__meta">
+                      <span v-if="certInfo.domains && certInfo.domains.length">
+                        {{ certInfo.domains.join(', ') }}
+                      </span>
+                      <span>{{ $t('setting.sslNotAfter') }}: {{ fmtCertDate(certInfo.notAfter) }}</span>
+                      <span v-if="certInfo.issuer">{{ certInfo.issuer }}</span>
+                    </div>
+                  </template>
+                  <span v-else-if="certInfo && certInfo.error" class="cert-status__err">
+                    {{ certInfo.error }}
+                  </span>
+                  <span v-else class="cert-status__none">{{ $t('setting.sslNone') }}</span>
+                </div>
+              </el-form-item>
               <!-- CF 自动签发面板 SSL — 走跟入站 TLS 一致的 wizard 流程 -->
-              <el-form-item label="自动签发 HTTPS" class="form-item--full">
+              <el-form-item :label="$t('setting.ui.autoHttps')" class="form-item--full">
                 <div class="auto-ssl">
                   <span class="auto-ssl__hint">
-                    ⚡ Cloudflare 一键签发:打开向导 → 选 zone(域名)+ 设前缀 → 自动加 A 记录 + 签 Let's Encrypt 证书 + 写 SSL 字段 + 重启面板
+                    {{ $t('setting.ui.autoHttpsHint') }}
                   </span>
                   <el-button type="primary" @click="cfPanelWizardVisible = true">
-                    打开签发向导
+                    {{ $t('setting.ui.openWizard') }}
                   </el-button>
                 </div>
               </el-form-item>
@@ -96,17 +128,17 @@
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane :label="$t('setting.kernel', '内核参数')" name="t6">
+        <el-tab-pane :label="$t('setting.kernel')" name="t6">
           <p class="kernel-intro">
-            sing-box 内核自身的运行参数,与面板/订阅无关。改完保存会下发并热重启 sing-box。
+            {{ $t('setting.ui.kernelIntro') }}
           </p>
 
           <el-collapse v-model="kernelActive" class="kernel-collapse">
             <!-- 日志 -->
             <el-collapse-item name="log">
               <template #title>
-                <span class="kernel-section-title">日志(Log)</span>
-                <span class="kernel-section-sub">sing-box 自身的运行日志,不是面板访问日志</span>
+                <span class="kernel-section-title">{{ $t('setting.ui.logTitle') }}</span>
+                <span class="kernel-section-sub">{{ $t('setting.ui.logSub') }}</span>
               </template>
               <div class="kernel-fields">
                 <div class="kernel-field">
@@ -116,27 +148,27 @@
                       <el-option v-for="l in logLevels" :key="l" :label="l" :value="l" />
                     </el-select>
                   </div>
-                  <p class="kernel-hint">日常 <code>info</code> 即可。排查协议握手/路由问题时调到 <code>debug</code> 或 <code>trace</code>;<code>error</code> 以下只记错误,日志体积最小。</p>
+                  <p class="kernel-hint">{{ $t('setting.ui.logLevelHintA') }}<code>info</code>{{ $t('setting.ui.logLevelHintB') }}<code>debug</code>{{ $t('setting.ui.logLevelHintC') }}<code>trace</code>{{ $t('setting.ui.logLevelHintD') }}<code>error</code>{{ $t('setting.ui.logLevelHintE') }}</p>
                 </div>
                 <div class="kernel-field">
                   <div class="kernel-field-row">
                     <label>{{ $t('basic.log.output') }}</label>
-                    <el-input v-model="kernel.log.output" placeholder="留空 = 标准输出" style="width: 320px" />
+                    <el-input v-model="kernel.log.output" :placeholder="$t('setting.ui.logOutputPlaceholder')" style="width: 320px" />
                   </div>
-                  <p class="kernel-hint">写到指定文件的绝对路径(例 <code>/var/log/sing-box.log</code>)。留空走 stdout / journald,跟随 systemd unit。</p>
+                  <p class="kernel-hint">{{ $t('setting.ui.logOutputHintA') }}<code>/var/log/sing-box.log</code>{{ $t('setting.ui.logOutputHintB') }}</p>
                 </div>
                 <div class="kernel-field kernel-field--inline">
                   <el-switch v-model="kernel.log.timestamp" />
                   <div>
                     <label>{{ $t('basic.log.timestamp') }}</label>
-                    <p class="kernel-hint">每行日志前加时间戳。文件输出建议开,stdout + systemd 已有时间戳可关。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.logTimestampHint') }}</p>
                   </div>
                 </div>
                 <div class="kernel-field kernel-field--inline">
                   <el-switch v-model="kernel.log.disabled" />
                   <div>
                     <label>{{ $t('disable') }}</label>
-                    <p class="kernel-hint">完全静默 —— 不推荐,出问题没法排查。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.logDisableHint') }}</p>
                   </div>
                 </div>
               </div>
@@ -145,38 +177,38 @@
             <!-- NTP -->
             <el-collapse-item name="ntp">
               <template #title>
-                <span class="kernel-section-title">NTP 校时</span>
-                <span class="kernel-section-sub">仅在系统时钟不准时才需要打开</span>
+                <span class="kernel-section-title">{{ $t('setting.ui.ntpTitle') }}</span>
+                <span class="kernel-section-sub">{{ $t('setting.ui.ntpSub') }}</span>
               </template>
               <div class="kernel-fields">
                 <div class="kernel-field kernel-field--inline">
                   <el-switch v-model="kernel.ntpEnabled" />
                   <div>
                     <label>{{ $t('enable') }}</label>
-                    <p class="kernel-hint">VLESS / Trojan / Shadowsocks 时钟差超 ±90 秒会握手失败。普通 VPS 系统级 NTP 已就位时<strong>不要开</strong>,会多一个 UDP 出网。仅容器/嵌入式没系统 NTP 才开。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.ntpEnableHintA') }}<strong>{{ $t('setting.ui.ntpEnableHintStrong') }}</strong>{{ $t('setting.ui.ntpEnableHintB') }}</p>
                   </div>
                 </div>
                 <template v-if="kernel.ntpEnabled">
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>NTP 服务器</label>
+                      <label>{{ $t('setting.ui.ntpServer') }}</label>
                       <el-input v-model="kernel.ntp.server" placeholder="time.apple.com" style="width: 240px" />
                     </div>
-                    <p class="kernel-hint">推荐 <code>time.apple.com</code> / <code>pool.ntp.org</code> / <code>ntp.aliyun.com</code>。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.ntpServerHintA') }}<code>time.apple.com</code>{{ $t('setting.ui.ntpServerHintSep') }}<code>pool.ntp.org</code>{{ $t('setting.ui.ntpServerHintSep') }}<code>ntp.aliyun.com</code>{{ $t('setting.ui.ntpServerHintEnd') }}</p>
                   </div>
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>端口</label>
+                      <label>{{ $t('in.port') }}</label>
                       <el-input-number v-model="kernel.ntp.server_port" :min="1" :max="65535" controls-position="right" style="width: 160px" />
                     </div>
-                    <p class="kernel-hint">NTP 标准端口是 <code>123</code>,极少需要改。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.ntpPortHintA') }}<code>123</code>{{ $t('setting.ui.ntpPortHintB') }}</p>
                   </div>
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>校时间隔(分钟)</label>
+                      <label>{{ $t('setting.ui.ntpInterval') }}</label>
                       <el-input-number v-model="kernel.ntpIntervalMin" :min="0" controls-position="right" style="width: 160px" />
                     </div>
-                    <p class="kernel-hint">每隔多少分钟向服务器同步一次。<code>30</code> 分钟够用。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.ntpIntervalHintA') }}<code>30</code>{{ $t('setting.ui.ntpIntervalHintB') }}</p>
                   </div>
                 </template>
               </div>
@@ -185,32 +217,32 @@
             <!-- Experimental -->
             <el-collapse-item name="exp">
               <template #title>
-                <span class="kernel-section-title">实验性(Experimental)</span>
-                <span class="kernel-section-sub">三个互相独立的子开关 · 默认全关</span>
+                <span class="kernel-section-title">{{ $t('setting.ui.expTitle') }}</span>
+                <span class="kernel-section-sub">{{ $t('setting.ui.expSub') }}</span>
               </template>
 
-              <h4 class="kernel-sub">Cache File · DNS / 路由结果落盘</h4>
+              <h4 class="kernel-sub">{{ $t('setting.ui.cacheTitle') }}</h4>
               <div class="kernel-fields">
                 <div class="kernel-field kernel-field--inline">
                   <el-switch v-model="kernel.cacheEnabled" />
                   <div>
                     <label>{{ $t('enable') }}</label>
-                    <p class="kernel-hint">把 DNS / FakeIP / 路由判定结果落盘,重启不丢热数据。流量小的小机器关掉省 IO,大流量节点开了启动后明显更快。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.cacheEnableHint') }}</p>
                   </div>
                 </div>
                 <template v-if="kernel.cacheEnabled">
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>缓存路径</label>
-                      <el-input v-model="kernel.cache.path" placeholder="留空 = 默认工作目录下的 cache.db" style="width: 320px" />
+                      <label>{{ $t('setting.ui.cachePath') }}</label>
+                      <el-input v-model="kernel.cache.path" :placeholder="$t('setting.ui.cachePathPlaceholder')" style="width: 320px" />
                     </div>
-                    <p class="kernel-hint">绝对路径或留空。多实例共存时务必各自指定不同文件。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.cachePathHint') }}</p>
                   </div>
                   <div class="kernel-field kernel-field--inline">
                     <el-switch v-model="kernel.cache.store_fakeip" />
                     <div>
-                      <label>持久化 FakeIP 映射</label>
-                      <p class="kernel-hint">用了 FakeIP 才有意义。开了之后 FakeIP ↔ 域名 映射重启不丢,客户端连接不会断。</p>
+                      <label>{{ $t('setting.ui.storeFakeip') }}</label>
+                      <p class="kernel-hint">{{ $t('setting.ui.storeFakeipHint') }}</p>
                     </div>
                   </div>
                 </template>
@@ -222,23 +254,23 @@
                   <el-switch v-model="kernel.clashEnabled" />
                   <div>
                     <label>{{ $t('enable') }}</label>
-                    <p class="kernel-hint">暴露 Clash 兼容控制端口,让 ClashX / Stash / OpenClash 这类客户端能切出站、看流量。<strong>s-ui 自己有控制台,通常不需要开</strong>;只有要把本机当 Clash 后端时才开。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.clashEnableHintA') }}<strong>{{ $t('setting.ui.clashEnableHintStrong') }}</strong>{{ $t('setting.ui.clashEnableHintB') }}</p>
                   </div>
                 </div>
                 <template v-if="kernel.clashEnabled">
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>监听</label>
+                      <label>{{ $t('setting.ui.listen') }}</label>
                       <el-input v-model="kernel.clash.external_controller" placeholder="127.0.0.1:9090" style="width: 240px" />
                     </div>
-                    <p class="kernel-hint">默认只听 <code>127.0.0.1</code>。改成 <code>0.0.0.0</code> 就对外开放了 —— 必须配 secret,否则任何人都能控制内核。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.clashListenHintA') }}<code>127.0.0.1</code>{{ $t('setting.ui.clashListenHintB') }}<code>0.0.0.0</code>{{ $t('setting.ui.clashListenHintC') }}</p>
                   </div>
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>访问 Secret</label>
-                      <el-input v-model="kernel.clash.secret" type="password" show-password placeholder="强烈建议设置" style="width: 320px" />
+                      <label>{{ $t('setting.ui.accessSecret') }}</label>
+                      <el-input v-model="kernel.clash.secret" type="password" show-password :placeholder="$t('setting.ui.stronglyRecommend')" style="width: 320px" />
                     </div>
-                    <p class="kernel-hint">客户端调用 API 时要带的 Bearer。监听对外时<strong>必填</strong>。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.clashSecretHintA') }}<strong>{{ $t('setting.ui.clashSecretHintStrong') }}</strong>{{ $t('setting.ui.clashSecretHintB') }}</p>
                   </div>
                 </template>
               </div>
@@ -249,22 +281,22 @@
                   <el-switch v-model="kernel.v2rayEnabled" />
                   <div>
                     <label>{{ $t('enable') }}</label>
-                    <p class="kernel-hint">老 V2Ray 风格的 gRPC 统计接口,给第三方流量统计 / 计费系统对接用。s-ui 内部统计走自有通道,<strong>普通用户不要开</strong>。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.v2rayEnableHintA') }}<strong>{{ $t('setting.ui.v2rayEnableHintStrong') }}</strong>{{ $t('setting.ui.v2rayEnableHintB') }}</p>
                   </div>
                 </div>
                 <template v-if="kernel.v2rayEnabled">
                   <div class="kernel-field">
                     <div class="kernel-field-row">
-                      <label>监听</label>
+                      <label>{{ $t('setting.ui.listen') }}</label>
                       <el-input v-model="kernel.v2ray.listen" placeholder="127.0.0.1:8080" style="width: 240px" />
                     </div>
-                    <p class="kernel-hint">同样建议只听 <code>127.0.0.1</code>。</p>
+                    <p class="kernel-hint">{{ $t('setting.ui.v2rayListenHintA') }}<code>127.0.0.1</code>{{ $t('setting.ui.v2rayListenHintB') }}</p>
                   </div>
                   <div class="kernel-field kernel-field--inline">
                     <el-switch v-model="kernel.v2ray.stats.enabled" />
                     <div>
-                      <label>启用 stats</label>
-                      <p class="kernel-hint">采集流量计数。关闭时只剩裸 API。</p>
+                      <label>{{ $t('setting.ui.enableStats') }}</label>
+                      <p class="kernel-hint">{{ $t('setting.ui.v2rayStatsHint') }}</p>
                     </div>
                   </div>
                 </template>
@@ -276,11 +308,11 @@
             <el-button type="primary" :loading="kernelSaving" :disabled="!kernelDirty" @click="saveKernel">
               <el-icon><Check /></el-icon>{{ $t('actions.save') }}
             </el-button>
-            <span v-if="kernelDirty" class="kernel-dirty-hint">改动未保存</span>
+            <span v-if="kernelDirty" class="kernel-dirty-hint">{{ $t('setting.ui.unsaved') }}</span>
           </div>
         </el-tab-pane>
 
-        <el-tab-pane :label="$t('setting.account', '账号')" name="t5">
+        <el-tab-pane :label="$t('setting.account')" name="t5">
           <el-form
             ref="accountFormRef"
             :model="account"
@@ -289,7 +321,7 @@
             class="settings-form"
           >
             <div class="settings-grid">
-              <el-form-item :label="$t('setting.currentUser', '当前用户')">
+              <el-form-item :label="$t('setting.currentUser')">
                 <el-input :model-value="account.currentUsername" disabled />
               </el-form-item>
               <el-form-item :label="$t('admin.oldPass')" prop="oldPass">
@@ -415,6 +447,8 @@ onMounted(async () => {
   loading.value = true
   await Promise.all([loadData(), loadAccount(), loadKernel()])
   loading.value = false
+  // 证书信息独立拉,不阻塞主设置加载
+  loadCertInfo()
 })
 
 const loadData = async () => {
@@ -447,6 +481,63 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // 面板 SSL 签发 wizard — 跟入站 TLS 一致的多步流程,复用 CloudflareTls.vue
 const cfPanelWizardVisible = ref(false)
+
+// ---- 面板 HTTPS 证书状态(到期时间 + 一键续签)----
+interface CertInfo {
+  configured: boolean
+  domains?: string[]
+  issuer?: string
+  notBefore?: number
+  notAfter?: number
+  daysLeft: number
+  expired: boolean
+  error?: string
+}
+const certInfo = ref<CertInfo | null>(null)
+const certLoading = ref(false)
+const renewing = ref(false)
+
+const loadCertInfo = async () => {
+  certLoading.value = true
+  const msg = await HttpUtils.get('api/panelCertInfo')
+  certLoading.value = false
+  if (msg.success) certInfo.value = msg.obj as CertInfo
+}
+
+// 到期时间格式化(本地时区)
+const fmtCertDate = (unix?: number) => {
+  if (!unix) return '-'
+  return new Date(unix * 1000).toLocaleString()
+}
+// 剩余天数配色:>30 天绿、7~30 天橙、<7 天/已过期红
+const certStatusType = computed(() => {
+  const c = certInfo.value
+  if (!c || !c.configured) return 'info'
+  if (c.expired || c.daysLeft < 7) return 'danger'
+  if (c.daysLeft < 30) return 'warning'
+  return 'success'
+})
+
+const renewSsl = async () => {
+  renewing.value = true
+  const tip = ElMessage({
+    type: 'info',
+    duration: 0,
+    showClose: false,
+    message: i18n.global.t('setting.ui.renewing'),
+  })
+  try {
+    const r = await HttpUtils.post('api/panelSslRenew', {})
+    if (r.success) {
+      ElMessage.success(i18n.global.t('setting.ui.renewSuccess'))
+      await sleep(4000)
+      window.location.reload()
+    }
+  } finally {
+    tip.close()
+    renewing.value = false
+  }
+}
 
 const restartApp = async () => {
   loading.value = true
@@ -553,7 +644,9 @@ const loadKernel = async () => {
 
 const saveKernel = async () => {
   kernelSaving.value = true
-  const cfg: any = Data().config ?? {}
+  // 深拷贝 store.config 再改,避免就地污染 Pinia store —— 否则未保存/保存失败时
+  // 脏字段已经进了 store,还会被别的页面的整份保存顺带持久化("幽灵保存")。
+  const cfg: any = JSON.parse(JSON.stringify(Data().config ?? {}))
   cfg.log = { ...kernel.value.log }
 
   if (kernel.value.ntpEnabled) {
@@ -658,6 +751,19 @@ const saveKernel = async () => {
 }
 .auto-ssl__hint { font-size: 12.5px; color: var(--nc-text-1); flex: 1; min-width: 200px; }
 .auto-ssl__warn { font-size: 12px; color: var(--nc-warning); margin: 4px 0 0; }
+
+.cert-status { width: 100%; }
+.cert-status__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cert-status__meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--nc-text-2);
+}
+.cert-status__err { font-size: 12.5px; color: var(--nc-danger); }
+.cert-status__none { font-size: 12.5px; color: var(--nc-text-2); }
 
 .settings-row {
   display: flex;

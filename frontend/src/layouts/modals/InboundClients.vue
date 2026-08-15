@@ -11,14 +11,14 @@
     <div class="ic-toolbar">
       <el-input
         v-model="filter"
-        :placeholder="$t('actions.search', '搜索名称 / 描述')"
+        :placeholder="$t('actions.search')"
         clearable
         class="ic-search"
       >
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <div class="ic-stats">
-        <span class="ic-stat"><span class="ic-stat__num">{{ scopedClients.length }}</span>{{ $t('main.tiles', '客户') }}</span>
+        <span class="ic-stat"><span class="ic-stat__num">{{ scopedClients.length }}</span>{{ $t('inboundClients.clientsUnit') }}</span>
         <span v-if="onlineInScope > 0" class="ic-stat ic-stat--ok">
           <span class="status-dot online"></span>{{ onlineInScope }} {{ $t('online') }}
         </span>
@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <el-empty v-if="scopedClients.length === 0" :description="$t('clients.empty', '此入站还没有客户端')">
+    <el-empty v-if="scopedClients.length === 0" :description="$t('inboundClients.empty')">
       <el-button type="primary" @click="openAdd">
         <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
       </el-button>
@@ -44,7 +44,7 @@
       class="nc-table ic-table"
       empty-text=" "
     >
-      <el-table-column :label="$t('enable', '启用')" width="68" align="center">
+      <el-table-column :label="$t('enable')" width="68" align="center">
         <template #default="{ row }">
           <el-switch
             :model-value="row.enable !== false"
@@ -65,7 +65,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column :label="$t('stats.volume', '流量')" min-width="170">
+      <el-table-column :label="$t('stats.volume')" min-width="170">
         <template #default="{ row }">
           <div class="vol-cell">
             <span class="vol-text mono" :class="volClass(row)">
@@ -84,10 +84,10 @@
         </template>
       </el-table-column>
 
-      <el-table-column :label="$t('date.expiry', '到期')" width="130">
+      <el-table-column :label="$t('date.expiry')" width="130">
         <template #default="{ row }">
-          <span v-if="row.expiry == 0" class="ic-muted mono">永久</span>
-          <span v-else-if="row.expiry <= Date.now() / 1000" class="exp-bad mono">已过期</span>
+          <span v-if="row.expiry == 0" class="ic-muted mono">{{ $t('inboundClients.permanent') }}</span>
+          <span v-else-if="row.expiry <= Date.now() / 1000" class="exp-bad mono">{{ $t('inboundClients.expired') }}</span>
           <span v-else class="exp-ok mono">{{ HumanReadable.remainedDays(row.expiry) }}</span>
         </template>
       </el-table-column>
@@ -98,7 +98,7 @@
           <span v-else class="ic-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="在线 IP" width="100" align="center">
+      <el-table-column :label="$t('inbounds.onlineIp')" width="100" align="center">
         <template #default="{ row }">
           <el-popover
             v-if="userIpCount(row.name) > 0"
@@ -114,15 +114,15 @@
             </template>
             <div class="ip-pop">
               <div class="ip-pop__head">
-                <b>{{ row.name }}</b> · 60s 内 {{ userIpCount(row.name) }} IP
-                <span v-if="userIpCount(row.name) > 1" class="warn-text">⚠ 疑似账号共享</span>
+                <b>{{ row.name }}</b>{{ $t('inboundClients.ipCount60s', { n: userIpCount(row.name) }) }}
+                <span v-if="userIpCount(row.name) > 1" class="warn-text">{{ $t('inboundClients.sharedSuspect') }}</span>
               </div>
-              <div v-if="userIpsLoading[row.name]" class="ip-pop__loading">加载中…</div>
+              <div v-if="userIpsLoading[row.name]" class="ip-pop__loading">{{ $t('loading') }}</div>
               <div v-else-if="userIpsCache[row.name]?.length" class="ip-pop__list mono">
                 <div v-for="ip in userIpsCache[row.name]" :key="ip" class="ip-pop__item">{{ ip }}</div>
               </div>
-              <div v-else class="ip-pop__empty">暂无具体 IP(可能正在过期 prune 中)</div>
-              <div class="ip-pop__hint">跨入站自动去重 — 同一账号在 N 个入站用,所有 source IP 汇总到这里</div>
+              <div v-else class="ip-pop__empty">{{ $t('inboundClients.noIpDetail') }}</div>
+              <div class="ip-pop__hint">{{ $t('inboundClients.ipHint') }}</div>
             </div>
           </el-popover>
           <span v-else class="ic-muted">0</span>
@@ -132,12 +132,12 @@
       <el-table-column :label="$t('actions.action')" width="156" align="center">
         <template #default="{ row }">
           <div class="row-actions">
-            <el-tooltip :content="$t('main.qr', 'QR / 链接')" placement="top">
+            <el-tooltip :content="$t('main.qr')" placement="top">
               <button class="ico-btn" @click="showQr(row)">
                 <el-icon style="color: var(--nc-primary)"><Picture /></el-icon>
               </button>
             </el-tooltip>
-            <el-tooltip v-if="Data().enableTraffic" :content="$t('stats.graphTitle', '流量图')" placement="top">
+            <el-tooltip v-if="Data().enableTraffic" :content="$t('stats.graphTitle')" placement="top">
               <button class="ico-btn" @click="showStats(row.name)">
                 <el-icon><DataLine /></el-icon>
               </button>
@@ -178,7 +178,7 @@
       :visible="qr.visible"
       :title="qr.title"
       :link="qr.link"
-      empty-text="此客户端在该入站下没有可分享的链接(可能是入站类型不支持 / 链接尚未生成)"
+      :empty-text="$t('inboundClients.noLinks')"
       @close="qr.visible = false"
     />
     <Stats
@@ -198,6 +198,7 @@ import Data from '@/store/modules/data'
 import { HumanReadable } from '@/plugins/utils'
 import HttpUtils from '@/plugins/httputil'
 import { Plus, Edit, Delete, Picture, DataLine, Search } from '@element-plus/icons-vue'
+import { i18n } from '@/locales'
 
 const ClientModal = defineAsyncComponent(() => import('@/layouts/modals/Client.vue'))
 const QrCode = defineAsyncComponent(() => import('@/layouts/modals/QrCode.vue'))
@@ -265,7 +266,7 @@ const toggleEnable = async (row: any, v: boolean) => {
     const fresh = await Data().loadClients(row.id)
     if (!fresh || !(fresh as any).id) {
       row.enable = original
-      ElMessage.error('客户端加载失败,请刷新页面')
+      ElMessage.error(i18n.global.t('inboundClients.loadFailed'))
       return
     }
     ;(fresh as any).enable = v

@@ -15,7 +15,7 @@
       <QrcodeVue :value="link" :size="size" :margin="1" class="qrcode-img" @click="copy" />
       <div class="qrcode-link mono select-all">{{ link }}</div>
       <el-button type="primary" size="small" @click="copy">
-        <el-icon><DocumentCopy /></el-icon>复制链接
+        <el-icon><DocumentCopy /></el-icon>{{ $t('copyLink') }}
       </el-button>
     </div>
   </el-dialog>

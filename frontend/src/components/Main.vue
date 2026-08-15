@@ -8,13 +8,13 @@
           <h3 class="hero__title">{{ panelName }}</h3>
           <div class="hero__versions">
             <span class="hero__ver">
-              <span class="hero__ver-label">面板</span>
+              <span class="hero__ver-label">{{ $t('main.dash.panel') }}</span>
               <span class="hero__ver-value mono">v{{ panelVersion || '—' }}</span>
             </span>
             <span class="hero__ver hero__ver--core" :class="{ 'is-stale': isCoreStale }">
-              <span class="hero__ver-label">内核</span>
+              <span class="hero__ver-label">{{ $t('main.dash.core') }}</span>
               <span class="hero__ver-value mono">{{ coreVersionLabel }}</span>
-              <el-tooltip v-if="isCoreStale" :content="`sing-box 当前 v${coreVersion},最新 v${LATEST_KNOWN_CORE} — 落后 ${stalePatchCount} 个 patch`" placement="top">
+              <el-tooltip v-if="isCoreStale" :content="$t('main.dash.coreStale', { cur: coreVersion, latest: LATEST_KNOWN_CORE, n: stalePatchCount })" placement="top">
                 <el-icon class="hero__ver-warn"><Warning /></el-icon>
               </el-tooltip>
             </span>
@@ -25,56 +25,56 @@
       <div class="hero__status" :class="sbdRunning ? 'is-up' : 'is-down'">
         <span class="hero__status-dot"></span>
         <div>
-          <div class="hero__status-text">{{ sbdRunning ? 'sing-box 运行中' : 'sing-box 已停止' }}</div>
+          <div class="hero__status-text">{{ sbdRunning ? $t('main.dash.running') : $t('main.dash.stopped') }}</div>
           <div class="hero__status-meta">{{ uptimeText }}</div>
         </div>
       </div>
 
       <div class="hero__actions">
-        <el-button @click="checkUpdate" :icon="UploadFilled" size="small" :loading="updating">检查更新</el-button>
-        <el-button @click="logModal.visible = true" :icon="Document" size="small">日志</el-button>
-        <el-button @click="backupModal.visible = true" :icon="DocumentCopy" size="small">备份</el-button>
-        <el-button @click="usageStatsModal.visible = true" :icon="DataAnalysis" size="small">统计</el-button>
-        <el-button v-if="sbdRunning" type="warning" plain :icon="Refresh" size="small" :loading="restarting" @click="restartSingbox">重启内核</el-button>
+        <el-button @click="checkUpdate" :icon="UploadFilled" size="small" :loading="updating">{{ $t('main.dash.checkUpdate') }}</el-button>
+        <el-button @click="logModal.visible = true" :icon="Document" size="small">{{ $t('basic.log.title') }}</el-button>
+        <el-button @click="backupModal.visible = true" :icon="DocumentCopy" size="small">{{ $t('main.dash.backup') }}</el-button>
+        <el-button @click="usageStatsModal.visible = true" :icon="DataAnalysis" size="small">{{ $t('main.dash.stats') }}</el-button>
+        <el-button v-if="sbdRunning" type="warning" plain :icon="Refresh" size="small" :loading="restarting" @click="restartSingbox">{{ $t('main.dash.restartCore') }}</el-button>
       </div>
     </div>
 
     <!-- 升级提示 dialog — checkUpdate 后弹出,显示版本对比 + 升级命令(只读)。
          不做面板自动重启升级:sui binary 自更新涉及 systemd reload + 自我替换,
          风险太高;让操作员在 SSH 终端跑 update.sh 才安全。 -->
-    <el-dialog v-model="updateDialog.visible" title="检查更新" width="540">
+    <el-dialog v-model="updateDialog.visible" :title="$t('main.dash.checkUpdate')" width="540">
       <div v-if="updateDialog.loading" style="text-align:center;padding:24px">
         <el-icon class="is-loading" :size="22"><Loading /></el-icon>
-        <div style="margin-top:8px;color:var(--nc-text-muted)">正在拉取 GitHub 最新 release…</div>
+        <div style="margin-top:8px;color:var(--nc-text-muted)">{{ $t('main.dash.fetchingRelease') }}</div>
       </div>
       <div v-else-if="updateDialog.error" class="upd-err">
         <el-alert :title="updateDialog.error" type="error" :closable="false" show-icon />
       </div>
       <div v-else>
-        <div class="upd-row"><span class="upd-k">当前版本</span><span class="mono upd-v">v{{ updateDialog.current }}</span></div>
-        <div class="upd-row"><span class="upd-k">最新 stable</span>
+        <div class="upd-row"><span class="upd-k">{{ $t('main.dash.currentVersion') }}</span><span class="mono upd-v">v{{ updateDialog.current }}</span></div>
+        <div class="upd-row"><span class="upd-k">{{ $t('main.dash.latestStable') }}</span>
           <span class="mono upd-v">{{ updateDialog.latestTag }}</span>
-          <el-tag v-if="updateDialog.hasUpdate" type="warning" size="small">有更新</el-tag>
-          <el-tag v-else type="success" size="small">已是最新</el-tag>
+          <el-tag v-if="updateDialog.hasUpdate" type="warning" size="small">{{ $t('main.dash.hasUpdate') }}</el-tag>
+          <el-tag v-else type="success" size="small">{{ $t('main.dash.upToDate') }}</el-tag>
         </div>
         <div v-if="updateDialog.publishedAt" class="upd-row">
-          <span class="upd-k">发布时间</span>
+          <span class="upd-k">{{ $t('main.dash.publishTime') }}</span>
           <span class="mono upd-v">{{ new Date(updateDialog.publishedAt).toLocaleString() }}</span>
         </div>
         <el-divider />
         <div v-if="updateDialog.hasUpdate">
-          <p style="margin:0 0 6px;font-size:13px;color:var(--nc-text-1);font-weight:600">SSH 终端跑以下命令完成升级(面板和内核同时升级):</p>
+          <p style="margin:0 0 6px;font-size:13px;color:var(--nc-text-1);font-weight:600">{{ $t('main.dash.upgradeCmdHint') }}</p>
           <div class="upd-cmd">
             <code class="mono">{{ updateDialog.upgradeCmd }}</code>
-            <el-button size="small" :icon="CopyDocument" @click="copyCmd">复制</el-button>
+            <el-button size="small" :icon="CopyDocument" @click="copyCmd">{{ $t('main.dash.copy') }}</el-button>
           </div>
           <p style="margin:8px 0 0;font-size:12px;color:var(--nc-text-muted)">
-            ⚠️ sing-box 内核是编译进 sui 二进制的 Go 模块,不能独立升级 — 升级面板会同时把内核升到该 release 锁定的版本。
+            {{ $t('main.dash.coreBundledNote') }}
           </p>
         </div>
-        <div v-else style="font-size:13px;color:var(--nc-text-muted)">面板已是最新版,无需升级。</div>
+        <div v-else style="font-size:13px;color:var(--nc-text-muted)">{{ $t('main.dash.noUpdateNeeded') }}</div>
         <div style="margin-top:10px;text-align:right">
-          <el-button size="small" @click="openReleasePage">在 GitHub 查看 Release Notes →</el-button>
+          <el-button size="small" @click="openReleasePage">{{ $t('main.dash.viewReleaseNotes') }}</el-button>
         </div>
       </div>
     </el-dialog>
@@ -87,11 +87,11 @@
           <span class="kpi__value mono">{{ cpuPct.toFixed(0) }}<span class="kpi__unit">%</span></span>
           <Ring :value="cpuPct" :color="ringColor(cpuPct)" />
         </div>
-        <span class="kpi__meta">{{ cpuCores }} 核</span>
+        <span class="kpi__meta">{{ $t('main.dash.cores', { n: cpuCores }) }}</span>
       </div>
 
       <div class="kpi-card nc-card">
-        <span class="kpi__label">内存</span>
+        <span class="kpi__label">{{ $t('main.info.memory') }}</span>
         <div class="kpi__row">
           <span class="kpi__value mono">{{ memPct.toFixed(0) }}<span class="kpi__unit">%</span></span>
           <Ring :value="memPct" :color="ringColor(memPct)" />
@@ -100,7 +100,7 @@
       </div>
 
       <div class="kpi-card nc-card">
-        <span class="kpi__label">↑ 上行 / ↓ 下行</span>
+        <span class="kpi__label">↑ {{ $t('home.topTraffic.up') }} / ↓ {{ $t('home.topTraffic.down') }}</span>
         <div class="kpi__rate">
           <span class="kpi__rate-up mono">{{ rateUpText }}/s</span>
           <span class="kpi__rate-down mono">{{ rateDownText }}/s</span>
@@ -109,11 +109,11 @@
       </div>
 
       <div class="kpi-card nc-card">
-        <span class="kpi__label">连接 · 在线</span>
+        <span class="kpi__label">{{ $t('main.dash.connOnline') }}</span>
         <div class="kpi__row kpi__row--multi">
           <div class="kpi__pair"><span class="kpi__pair-k">TCP</span><span class="kpi__pair-v mono">{{ connStats.tcp }}</span></div>
           <div class="kpi__pair"><span class="kpi__pair-k">UDP</span><span class="kpi__pair-v mono">{{ connStats.udp }}</span></div>
-          <div class="kpi__pair"><span class="kpi__pair-k">用户</span><span class="kpi__pair-v mono">{{ onlineUsers }}</span></div>
+          <div class="kpi__pair"><span class="kpi__pair-k">{{ $t('objects.user') }}</span><span class="kpi__pair-v mono">{{ onlineUsers }}</span></div>
           <div class="kpi__pair"><span class="kpi__pair-k">IP</span><span class="kpi__pair-v mono">{{ onlineIps }}</span></div>
         </div>
       </div>
@@ -132,6 +132,7 @@ import { HumanReadable } from '@/plugins/utils'
 import Data from '@/store/modules/data'
 import { Document, DocumentCopy, DataAnalysis, Refresh, Warning, UploadFilled, CopyDocument, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { i18n } from '@/locales'
 
 const Logs = defineAsyncComponent(() => import('@/layouts/modals/Logs.vue'))
 const Backup = defineAsyncComponent(() => import('@/layouts/modals/Backup.vue'))
@@ -164,8 +165,8 @@ const stalePatchCount = computed(() => {
 
 const uptimeSec = computed(() => Number(tilesData.value?.sbd?.stats?.Uptime ?? 0))
 const uptimeText = computed(() => sbdRunning.value
-  ? '已运行 ' + HumanReadable.formatSecond(uptimeSec.value)
-  : '点击「重启内核」以启动')
+  ? i18n.global.t('main.dash.uptime', { t: HumanReadable.formatSecond(uptimeSec.value) })
+  : i18n.global.t('main.dash.clickToStart'))
 
 // CPU/内存
 // 后端 GetCpuPercent() 返回单个 float64(整机聚合 CPU%);早期写成 cpu[0] 是
@@ -335,10 +336,10 @@ const checkUpdate = async () => {
     const r = await fetch('https://api.github.com/repos/DoBestone/nexcore-s-ui/releases?per_page=10', {
       headers: { 'Accept': 'application/vnd.github+json' }
     })
-    if (!r.ok) throw new Error('GitHub 返回 ' + r.status)
+    if (!r.ok) throw new Error(i18n.global.t('main.dash.githubReturned', { status: r.status }))
     const rels: any[] = await r.json()
     const stable = rels.find(x => !x.prerelease && x.tag_name)
-    if (!stable) throw new Error('GitHub 暂无 stable release')
+    if (!stable) throw new Error(i18n.global.t('main.dash.noStableRelease'))
     const latestTag: string = stable.tag_name
     const latest = latestTag.replace(/^v/, '')
     const cur = panelVersion.value
@@ -355,13 +356,13 @@ const checkUpdate = async () => {
       upgradeCmd: 'bash <(curl -Ls https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/update.sh)',
     }
   } catch (e: any) {
-    updateDialog.value = { ...updateDialog.value, loading: false, error: '检查失败: ' + (e?.message || e) }
+    updateDialog.value = { ...updateDialog.value, loading: false, error: i18n.global.t('main.dash.checkFailed', { msg: (e?.message || e) }) }
   }
   updating.value = false
 }
 const copyCmd = async () => {
-  try { await navigator.clipboard.writeText(updateDialog.value.upgradeCmd); ElMessage.success('已复制') }
-  catch { ElMessage.warning('复制失败,请手动选中') }
+  try { await navigator.clipboard.writeText(updateDialog.value.upgradeCmd); ElMessage.success(i18n.global.t('main.dash.copied')) }
+  catch { ElMessage.warning(i18n.global.t('main.dash.copyFailed')) }
 }
 const openReleasePage = () => { window.open(updateDialog.value.latestUrl || 'https://github.com/DoBestone/nexcore-s-ui/releases', '_blank') }
 </script>

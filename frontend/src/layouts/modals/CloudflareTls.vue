@@ -5,7 +5,7 @@
     @close="onClose"
     class="constrained-dialog is-medium"
     :align-center="false"
-    :title="mode === 'panel' ? '面板 SSL — Cloudflare 一键签发' : $t('tls.cf.title')"
+    :title="mode === 'panel' ? $t('tls.cf.panelTitle') : $t('tls.cf.title')"
     destroy-on-close
   >
     <el-steps :active="step" finish-status="success" simple class="cf-steps">
@@ -16,7 +16,7 @@
 
     <el-form label-position="top" v-if="step === 0">
       <el-alert v-if="savedHint" type="success" :closable="false" show-icon class="cf-alert">
-        <template #title>已加载持久化保存的 Token,可直接「校验并继续」;如需更换粘贴新 token 即可。</template>
+        <template #title>{{ $t('tls.cf.tokenLoaded') }}</template>
       </el-alert>
       <el-alert v-else :title="$t('tls.cf.tokenHint')" type="info" :closable="false" show-icon class="cf-alert" />
       <el-form-item :label="$t('tls.cf.token')">
@@ -31,9 +31,9 @@
         <el-input v-model="form.email" :placeholder="`admin@${form.fqdn || 'example.com'}`" />
       </el-form-item>
       <el-form-item>
-        <el-checkbox v-model="form.persist">校验通过后保存 Token + 邮箱(用于自动续签)</el-checkbox>
-        <p class="form-hint">面板 DB 里持久化(base64 混淆),后续添加入站时「TLS → 自动签发」可一键复用,不用再粘 token。</p>
-        <el-button v-if="savedHint" size="small" link type="danger" @click="clearSaved">清空已保存的 Token</el-button>
+        <el-checkbox v-model="form.persist">{{ $t('tls.cf.persistLabel') }}</el-checkbox>
+        <p class="form-hint">{{ $t('tls.cf.persistHint') }}</p>
+        <el-button v-if="savedHint" size="small" link type="danger" @click="clearSaved">{{ $t('tls.cf.clearSaved') }}</el-button>
       </el-form-item>
     </el-form>
 
@@ -55,7 +55,7 @@
           <el-radio value="custom">{{ $t('tls.cf.prefixCustom') }}</el-radio>
           <el-radio v-if="mode !== 'panel'" value="apex">{{ $t('tls.cf.prefixApex') }}</el-radio>
         </el-radio-group>
-        <p v-if="mode === 'panel'" class="form-hint">面板必须有具体子域名(随机 / 自定义),wildcard 和根域不适合面板场景</p>
+        <p v-if="mode === 'panel'" class="form-hint">{{ $t('tls.cf.panelSubdomainHint') }}</p>
       </el-form-item>
       <el-form-item v-if="form.prefixMode === 'wildcard'" :label="$t('tls.cf.wildcardLabel')">
         <el-input v-model="form.wildcardLabel" :placeholder="$t('tls.cf.wildcardLabelPlaceholder')">
@@ -95,8 +95,8 @@
         </template>
       </el-alert>
       <p v-if="mode === 'panel'" class="form-hint">
-        点「签发并启用 HTTPS」 → 后端会跑 ACME DNS-01 + 写 webCertFile/webKeyFile/webDomain settings + 自动重启面板。
-        签发约需 30s ~ 2min,完成后页面自动跳转到 <code class="mono">https://{{ result.fqdn }}</code>
+        {{ $t('tls.cf.panelIssueExplain') }}
+        {{ $t('tls.cf.panelIssueRedirect') }}<code class="mono">https://{{ result.fqdn }}</code>
       </p>
       <p v-else class="form-hint">{{ $t('tls.cf.issueExplain') }}</p>
     </el-form>
@@ -114,7 +114,7 @@
         {{ $t('tls.cf.issue') }}
       </el-button>
       <el-button v-if="step === 2 && mode === 'panel'" type="primary" :loading="loading" :disabled="!result.fqdn" @click="onIssuePanel">
-        签发并启用 HTTPS
+        {{ $t('tls.cf.issueEnableHttps') }}
       </el-button>
     </template>
   </el-dialog>
@@ -186,7 +186,7 @@ const clearSaved = async () => {
   form.value.token = ''
   form.value.email = ''
   savedHint.value = false
-  ElMessage.success('已清空保存的 Token')
+  ElMessage.success(i18n.global.t('tls.cf.savedCleared'))
 }
 
 const persistIfChecked = async () => {
@@ -313,12 +313,12 @@ const onIssuePanel = async () => {
     type: 'info',
     duration: 0,
     showClose: false,
-    message: `正在向 Let's Encrypt 申请 ${result.value.fqdn} 的证书,DNS 传播 + 签发约需 30s ~ 2min…`,
+    message: i18n.global.t('tls.cf.panelIssuing', { fqdn: result.value.fqdn }),
   })
   try {
     const r = await HttpUtils.post('api/panelSslIssue', { domain: result.value.fqdn })
     if (r.success) {
-      ElMessage.success(`签发成功!2 秒后面板自动重启,届时跳转 https://${result.value.fqdn}…`)
+      ElMessage.success(i18n.global.t('tls.cf.panelIssueSuccess', { fqdn: result.value.fqdn }))
       // 让用户看一会成功提示再跳。port/path 从当前 URL 推 — 仍是同一台机器
       const port = window.location.port || '3095'
       const path = window.location.pathname.startsWith('/app') ? '/app/' : '/'

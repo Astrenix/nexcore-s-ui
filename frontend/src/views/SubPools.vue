@@ -3,73 +3,73 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.subPools') }}</h2>
-        <p class="page-desc">导入机场订阅链接,系统自动探测每条节点的真落地 IP + 延迟,按国家分组,只挑最快一条作为出站 winner;入站可直接绑「订阅池(选国家)」,节点更新对入站透明。</p>
+        <p class="page-desc">{{ $t('subpool.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button @click="loadAll" :loading="loading">
-          <el-icon><Refresh /></el-icon>刷新视图
+          <el-icon><Refresh /></el-icon>{{ $t('subpool.refreshView') }}
         </el-button>
         <el-popconfirm
-          title="清空订阅源 + 节点池 + 国家池出站(pool-*)。绑了 pool-* 的入站会失去出站,需要重新挑出站。确定?"
-          confirm-button-text="确定清空"
-          cancel-button-text="取消"
+          :title="$t('subpool.resetConfirm')"
+          :confirm-button-text="$t('subpool.resetConfirmBtn')"
+          :cancel-button-text="$t('actions.cancel')"
           @confirm="resetAll"
           width="380"
         >
           <template #reference>
             <el-button :disabled="subs.length === 0 && pools.length === 0">
-              <el-icon><Delete /></el-icon>一键清理
+              <el-icon><Delete /></el-icon>{{ $t('subpool.cleanup') }}
             </el-button>
           </template>
         </el-popconfirm>
         <el-button type="primary" @click="openSubEdit(null)">
-          <el-icon><Plus /></el-icon>新增订阅
+          <el-icon><Plus /></el-icon>{{ $t('subpool.addSub') }}
         </el-button>
       </div>
     </div>
 
     <div class="nc-card">
-      <div class="section-title">订阅源</div>
+      <div class="section-title">{{ $t('subpool.subSources') }}</div>
       <el-table :data="subs" stripe>
-        <el-table-column label="启用" width="78">
+        <el-table-column :label="$t('enable')" width="78">
           <template #default="{ row }">
             <el-switch :model-value="row.enable" @change="(val: boolean) => toggleEnable(row, val)" />
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="name" :label="$t('subpool.name')" min-width="160" show-overflow-tooltip />
         <el-table-column prop="url" label="URL" min-width="280" show-overflow-tooltip>
           <template #default="{ row }"><span class="mono">{{ row.url }}</span></template>
         </el-table-column>
-        <el-table-column label="刷新周期" width="120">
-          <template #default="{ row }">每 {{ row.refresh_interval }} 分钟</template>
+        <el-table-column :label="$t('subpool.refreshInterval')" width="120">
+          <template #default="{ row }">{{ $t('subpool.everyNMinutes', { n: row.refresh_interval }) }}</template>
         </el-table-column>
-        <el-table-column label="上次同步" width="200">
+        <el-table-column :label="$t('subpool.lastSync')" width="200">
           <template #default="{ row }">
             <span v-if="row.last_synced_at && !isZeroTime(row.last_synced_at)">{{ formatTime(row.last_synced_at) }}</span>
-            <span v-else class="muted">从未同步</span>
+            <span v-else class="muted">{{ $t('subpool.neverSynced') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="120">
+        <el-table-column :label="$t('subpool.status')" width="120">
           <template #default="{ row }">
-            <el-tag v-if="row.last_status === 'ok'" type="success" size="small">OK · {{ row.last_node_count }} 节点</el-tag>
-            <el-tag v-else-if="row.last_status === 'failed'" type="danger" size="small">失败</el-tag>
-            <el-tag v-else type="info" size="small" effect="plain">未同步</el-tag>
+            <el-tag v-if="row.last_status === 'ok'" type="success" size="small">{{ $t('subpool.okNodes', { n: row.last_node_count }) }}</el-tag>
+            <el-tag v-else-if="row.last_status === 'failed'" type="danger" size="small">{{ $t('failed') }}</el-tag>
+            <el-tag v-else type="info" size="small" effect="plain">{{ $t('subpool.notSynced') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" align="center">
+        <el-table-column :label="$t('actions.action')" width="180" align="center">
           <template #default="{ row }">
-            <el-tooltip content="立即刷新(同步探测,可能耗时 30s+)" placement="top">
+            <el-tooltip :content="$t('subpool.refreshNow')" placement="top">
               <el-button text :loading="refreshingId === row.id" @click="refreshSub(row)">
                 <el-icon><RefreshRight /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="编辑" placement="top">
+            <el-tooltip :content="$t('actions.edit')" placement="top">
               <el-button text @click="openSubEdit(row)">
                 <el-icon><Edit /></el-icon>
               </el-button>
             </el-tooltip>
             <el-popconfirm
-              title="删除订阅 + 节点池里这家的全部节点?(已选 winner 的国家会重选,如池空则保留旧 winner)"
+              :title="$t('subpool.delSubConfirm')"
               @confirm="delSub(row.id)"
             >
               <template #reference>
@@ -79,16 +79,16 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="subs.length === 0 && !loading" description="还没有订阅源 — 点「新增订阅」从机场链接导入" />
+      <el-empty v-if="subs.length === 0 && !loading" :description="$t('subpool.emptySubs')" />
       <div v-if="lastRefresh" class="muted refresh-banner">
         <el-icon><InfoFilled /></el-icon>
-        刷新结果:解析 <b>{{ lastRefresh.parsed }}</b>/{{ lastRefresh.total }},探测存活 <b>{{ lastRefresh.alive }}</b>
+        {{ $t('subpool.refreshResult') }} <b>{{ lastRefresh.parsed }}</b>/{{ lastRefresh.total }}{{ $t('subpool.probeAlive') }} <b>{{ lastRefresh.alive }}</b>
         <span v-if="lastRefresh.error" class="err"> · {{ lastRefresh.error }}</span>
       </div>
     </div>
 
     <div class="nc-card" style="margin-top:16px">
-      <div class="section-title">国家池(winner 选举状态)— 点行展开看全部节点</div>
+      <div class="section-title">{{ $t('subpool.countryPoolTitle') }}</div>
       <el-table :data="pools" stripe row-key="country" @expand-change="onExpandPool">
         <el-table-column type="expand" width="50">
           <template #default="{ row }">
@@ -100,90 +100,90 @@
                     <span v-else class="dot dot-bad" title="dead" />
                   </template>
                 </el-table-column>
-                <el-table-column label="节点名" min-width="180" show-overflow-tooltip>
-                  <template #default="{ row: n }"><span>{{ n.remark || '(无名)' }}</span></template>
+                <el-table-column :label="$t('subpool.nodeName')" min-width="180" show-overflow-tooltip>
+                  <template #default="{ row: n }"><span>{{ n.remark || $t('subpool.noName') }}</span></template>
                 </el-table-column>
-                <el-table-column label="入口" min-width="220" show-overflow-tooltip>
+                <el-table-column :label="$t('subpool.entry')" min-width="220" show-overflow-tooltip>
                   <template #default="{ row: n }"><span class="mono">{{ n.server }}:{{ n.server_port }}</span></template>
                 </el-table-column>
-                <el-table-column label="协议" width="100">
+                <el-table-column :label="$t('protocol')" width="100">
                   <template #default="{ row: n }"><span class="muted">{{ n.type }}</span></template>
                 </el-table-column>
-                <el-table-column label="落地 IP" width="140">
+                <el-table-column :label="$t('subpool.exitIp')" width="140">
                   <template #default="{ row: n }">
                     <span v-if="n.exit_ip" class="mono">{{ n.exit_ip }}</span>
                     <span v-else class="muted">—</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="延迟" width="80">
+                <el-table-column :label="$t('out.delay')" width="80">
                   <template #default="{ row: n }">
                     <span v-if="n.alive" :class="latencyClass(n.latency_ms)">{{ n.latency_ms }}ms</span>
                     <span v-else class="muted">—</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态 / 失败原因" min-width="260">
+                <el-table-column :label="$t('subpool.statusFailReason')" min-width="260">
                   <template #default="{ row: n }">
                     <span v-if="n.alive" class="ok">OK</span>
-                    <el-tooltip v-else :content="n.last_error || '未探测'" placement="top" :show-after="200">
+                    <el-tooltip v-else :content="n.last_error || $t('subpool.notProbed')" placement="top" :show-after="200">
                       <span class="err mono">{{ shortError(n.last_error) }}</span>
                     </el-tooltip>
                   </template>
                 </el-table-column>
-                <el-table-column label="最后探测" width="170">
+                <el-table-column :label="$t('subpool.lastProbe')" width="170">
                   <template #default="{ row: n }">
                     <span class="muted">{{ formatTime(n.last_check_at) }}</span>
                   </template>
                 </el-table-column>
               </el-table>
-              <div v-else class="muted" style="padding:8px 12px">加载中…</div>
+              <div v-else class="muted" style="padding:8px 12px">{{ $t('loading') }}</div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="国家" width="100">
+        <el-table-column :label="$t('subpool.country')" width="100">
           <template #default="{ row }">
             <span class="cc-badge">{{ row.country }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="出站 tag" width="160">
+        <el-table-column :label="$t('subpool.outboundTag')" width="160">
           <template #default="{ row }">
             <span v-if="row.outbound_tag" class="mono">{{ row.outbound_tag }}</span>
-            <span v-else class="muted">未创建</span>
+            <span v-else class="muted">{{ $t('subpool.notCreated') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="当前 Winner" min-width="320">
+        <el-table-column :label="$t('subpool.currentWinner')" min-width="320">
           <template #default="{ row }">
             <div v-if="row.winner">
               <div><b>{{ row.winner.remark || row.winner.server }}</b> <span class="muted">· {{ row.winner.type }}</span></div>
               <div class="muted mono">{{ row.winner.server }}:{{ row.winner.server_port }} → exit {{ row.winner.exit_ip }}</div>
             </div>
-            <span v-else class="warn">⚠ 池里无可用节点</span>
+            <span v-else class="warn">{{ $t('subpool.noAvailableNode') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="延迟" width="90">
+        <el-table-column :label="$t('out.delay')" width="90">
           <template #default="{ row }">
             <span v-if="row.winner" :class="latencyClass(row.winner.latency_ms)">{{ row.winner.latency_ms }}ms</span>
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column label="池规模" width="110">
+        <el-table-column :label="$t('subpool.poolSize')" width="110">
           <template #default="{ row }">
             <span class="muted">{{ row.alive }}/{{ row.total }} alive</span>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="pools.length === 0 && !loading" description="还没有国家池 — 添加订阅并刷新后,国家会自动出现" />
+      <el-empty v-if="pools.length === 0 && !loading" :description="$t('subpool.emptyPools')" />
     </div>
 
     <div class="nc-card" style="margin-top:16px">
-      <div class="section-title">订阅池出站 — 协议字段自动维护,「显示名」(中转名称)可改</div>
+      <div class="section-title">{{ $t('subpool.poolOutboundsTitle') }}</div>
       <el-table :data="poolOutbounds" stripe size="small">
-        <el-table-column label="国家" width="100">
+        <el-table-column :label="$t('subpool.country')" width="100">
           <template #default="{ row }"><span class="cc-badge">{{ row.country }}</span></template>
         </el-table-column>
-        <el-table-column label="出站 tag" width="160">
+        <el-table-column :label="$t('subpool.outboundTag')" width="160">
           <template #default="{ row }"><span class="mono">{{ row.tag }}</span></template>
         </el-table-column>
-        <el-table-column label="显示名(中转名称)" min-width="220">
+        <el-table-column :label="$t('subpool.displayNameCol')" min-width="220">
           <template #default="{ row }">
             <span>{{ row.display_name }}</span>
             <el-button text size="small" style="margin-left:6px" @click="openEditDisplayName(row)">
@@ -191,43 +191,42 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="协议" width="100">
+        <el-table-column :label="$t('protocol')" width="100">
           <template #default="{ row }"><span class="muted">{{ row.type }}</span></template>
         </el-table-column>
-        <el-table-column label="当前 winner node" width="120">
+        <el-table-column :label="$t('subpool.currentWinnerNode')" width="120">
           <template #default="{ row }">
             <span v-if="row.winner_node_id" class="mono">#{{ row.winner_node_id }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="winner 延迟" width="120">
+        <el-table-column :label="$t('subpool.winnerLatency')" width="120">
           <template #default="{ row }">
             <span v-if="row.winner_latency" :class="latencyClass(row.winner_latency)">{{ row.winner_latency }}ms</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="最后更新" width="180">
+        <el-table-column :label="$t('subpool.lastUpdate')" width="180">
           <template #default="{ row }"><span class="muted">{{ formatTime(row.updated_at) }}</span></template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="poolOutbounds.length === 0 && !loading" description="还没有订阅池出站 — 添加订阅并刷新,winner 选出后自动创建" />
+      <el-empty v-if="poolOutbounds.length === 0 && !loading" :description="$t('subpool.emptyPoolOutbounds')" />
       <div class="muted" style="font-size:12px; margin-top:8px">
-        💡 入站绑这些 tag(`pool-jp` / `pool-hk` …)即可走对应国家;sing-box 看到的是
-        「出站管理」+「订阅池出站」union 后的完整列表
+        {{ $t('subpool.poolOutboundsHint') }}
       </div>
     </div>
 
     <!-- 编辑订阅池出站「显示名」-->
-    <el-dialog v-model="poolDisplayDialog" title="编辑订阅池出站 · 显示名" width="480px">
+    <el-dialog v-model="poolDisplayDialog" :title="$t('subpool.editDisplayNameTitle')" width="480px">
       <el-form :model="editingPool" label-width="100px">
-        <el-form-item label="国家">
+        <el-form-item :label="$t('subpool.country')">
           <span class="cc-badge">{{ editingPool.country }}</span>
           <span class="mono muted" style="margin-left:8px">{{ editingPool.tag }}</span>
         </el-form-item>
-        <el-form-item label="显示名">
-          <el-input v-model="editingPool.display_name" placeholder="例如:日本机场池、HK-Premium…" />
+        <el-form-item :label="$t('subpool.displayName')">
+          <el-input v-model="editingPool.display_name" :placeholder="$t('subpool.displayNamePlaceholder')" />
           <div class="muted" style="font-size:12px; margin-top:4px">
-            分享链接(vless/vmess 链接的 ps 字段)中转模式时取这里的值,格式 <code>&lt;显示名&gt;-&lt;客户端名&gt;</code>
+            {{ $t('subpool.displayNameHint') }}<code>{{ $t('subpool.displayNameFormat') }}</code>
           </div>
         </el-form-item>
       </el-form>
@@ -238,19 +237,19 @@
     </el-dialog>
 
     <!-- 订阅新增/编辑 -->
-    <el-dialog v-model="subDialog" :title="editing.id ? '编辑订阅源' : '新增订阅源'" width="540px">
+    <el-dialog v-model="subDialog" :title="editing.id ? $t('subpool.editSubTitle') : $t('subpool.addSubTitle')" width="540px">
       <el-form :model="editing" label-width="100px">
-        <el-form-item label="名称">
-          <el-input v-model="editing.name" placeholder="e.g. 2N订阅" />
+        <el-form-item :label="$t('subpool.name')">
+          <el-input v-model="editing.name" :placeholder="$t('subpool.namePlaceholder')" />
         </el-form-item>
-        <el-form-item label="订阅 URL">
+        <el-form-item :label="$t('subpool.subUrl')">
           <el-input v-model="editing.url" placeholder="https://api.example.com/subscribe?token=..." />
         </el-form-item>
-        <el-form-item label="刷新周期(分)">
+        <el-form-item :label="$t('subpool.refreshIntervalMin')">
           <el-input-number v-model="editing.refresh_interval" :min="0" :max="1440" :step="10" />
-          <span class="muted" style="margin-left:8px">0 = 仅手动刷新</span>
+          <span class="muted" style="margin-left:8px">{{ $t('subpool.manualOnly') }}</span>
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('enable')">
           <el-switch v-model="editing.enable" />
         </el-form-item>
       </el-form>
@@ -267,6 +266,7 @@ import { ref, reactive, onMounted } from 'vue'
 import HttpUtils from '@/plugins/httputil'
 import { ElMessage } from 'element-plus'
 import { Refresh, RefreshRight, Plus, Edit, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { i18n } from '@/locales'
 
 interface Sub {
   id?: number
@@ -362,16 +362,16 @@ const latencyClass = (ms: number) => {
 
 // 失败原因往往很长(完整 Go err 字符串带堆栈/包路径),表格里截短显示,tooltip 看全文
 const shortError = (err: string) => {
-  if (!err) return '未探测'
+  if (!err) return i18n.global.t('subpool.notProbed')
   // 命中常见错误关键词,转更易懂的简短提示
-  if (/i\/o timeout/.test(err)) return 'TCP timeout(网络不可达)'
-  if (/EOF/.test(err)) return 'session EOF(机场端拒绝)'
-  if (/connection refused/.test(err)) return '连接被拒(端口关闭)'
-  if (/no route to host/.test(err)) return '无路由(机房黑洞)'
-  if (/tls/i.test(err) && /handshake/i.test(err)) return 'TLS 握手失败'
-  if (/http 4\d\d/i.test(err)) return err.match(/http \d+/)?.[0] ?? 'http 错误'
-  if (/http 5\d\d/i.test(err)) return err.match(/http \d+/)?.[0] ?? 'http 错误'
-  if (/ctx done/.test(err)) return '总超时'
+  if (/i\/o timeout/.test(err)) return i18n.global.t('subpool.errTcpTimeout')
+  if (/EOF/.test(err)) return i18n.global.t('subpool.errEof')
+  if (/connection refused/.test(err)) return i18n.global.t('subpool.errRefused')
+  if (/no route to host/.test(err)) return i18n.global.t('subpool.errNoRoute')
+  if (/tls/i.test(err) && /handshake/i.test(err)) return i18n.global.t('subpool.errTlsHandshake')
+  if (/http 4\d\d/i.test(err)) return err.match(/http \d+/)?.[0] ?? i18n.global.t('subpool.errHttp')
+  if (/http 5\d\d/i.test(err)) return err.match(/http \d+/)?.[0] ?? i18n.global.t('subpool.errHttp')
+  if (/ctx done/.test(err)) return i18n.global.t('subpool.errTimeout')
   // fallback:取最后一段(常是 root cause)
   return err.length > 60 ? err.slice(-60) : err
 }
@@ -416,14 +416,14 @@ const openSubEdit = (row: Sub | null) => {
 }
 
 const saveSub = async () => {
-  if (!editing.value.url.trim()) { ElMessage.error('URL 必填'); return }
+  if (!editing.value.url.trim()) { ElMessage.error(i18n.global.t('subpool.urlRequired')); return }
   saving.value = true
   try {
     const fd = new FormData()
     Object.entries(editing.value).forEach(([k, v]) => fd.append(k, String(v ?? '')))
     const res = await HttpUtils.post('api/subSave', fd as any)
     if (res.success) {
-      ElMessage.success(editing.value.id ? '已更新' : '已新增 — 点立即刷新拉取节点')
+      ElMessage.success(editing.value.id ? i18n.global.t('subpool.updated') : i18n.global.t('subpool.added'))
       subDialog.value = false
       await loadAll()
     }
@@ -437,7 +437,7 @@ const delSub = async (id: number) => {
   const res = await HttpUtils.post('api/subDelete', fd as any)
   if (res.success) {
     // 后端 Delete 已级联清节点 + 重选 + 删孤儿 pool;前端只需重拉视图
-    ElMessage.success('已删除订阅及其节点;同国家剩余其他订阅有节点的 winner 已重选,孤儿 pool 已清理')
+    ElMessage.success(i18n.global.t('subpool.delSubSuccess'))
     await loadAll()
   }
 }
@@ -445,10 +445,10 @@ const delSub = async (id: number) => {
 const resetAll = async () => {
   const res = await HttpUtils.post('api/poolReset', {} as any)
   if (res.success) {
-    ElMessage.success('订阅池已清空(subs + 节点池 + pool-* 出站)')
+    ElMessage.success(i18n.global.t('subpool.resetSuccess'))
     await loadAll()
   } else {
-    ElMessage.error('清空失败:' + (res.msg || ''))
+    ElMessage.error(i18n.global.t('subpool.resetFailed') + (res.msg || ''))
   }
 }
 
@@ -456,7 +456,7 @@ const toggleEnable = async (row: Sub, val: boolean) => {
   const fd = new FormData()
   Object.entries({ ...row, enable: val }).forEach(([k, v]) => fd.append(k, String(v ?? '')))
   const res = await HttpUtils.post('api/subSave', fd as any)
-  if (res.success) { row.enable = val } else { ElMessage.error('切换失败') }
+  if (res.success) { row.enable = val } else { ElMessage.error(i18n.global.t('subpool.toggleFailed')) }
 }
 
 const refreshSub = async (row: Sub) => {
@@ -467,9 +467,9 @@ const refreshSub = async (row: Sub) => {
     const res = await HttpUtils.post('api/subRefresh', fd as any)
     if (res.success && res.obj) {
       lastRefresh.value = res.obj
-      ElMessage.success(`刷新完成:存活 ${res.obj.alive} / 解析 ${res.obj.parsed}`)
+      ElMessage.success(i18n.global.t('subpool.refreshDone', { alive: res.obj.alive, parsed: res.obj.parsed }))
     } else {
-      ElMessage.error('刷新失败:' + (res.msg || '未知'))
+      ElMessage.error(i18n.global.t('subpool.refreshFailed') + (res.msg || i18n.global.t('subpool.unknown')))
     }
     await loadAll()
   } finally {
@@ -491,7 +491,7 @@ const savePoolDisplayName = async () => {
     fd.append('display_name', editingPool.value.display_name || '')
     const res = await HttpUtils.post('api/poolOutboundSave', fd as any)
     if (res.success) {
-      ElMessage.success('已保存 — 分享链接下次生成时会用新名称')
+      ElMessage.success(i18n.global.t('subpool.displayNameSaved'))
       poolDisplayDialog.value = false
       await loadAll()
     }

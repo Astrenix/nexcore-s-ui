@@ -3,7 +3,7 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.tls') }}</h2>
-        <p class="page-desc">{{ $t('tls.desc', 'TLS / Reality / ECH / ACME 证书集中管理') }}</p>
+        <p class="page-desc">{{ $t('tls.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button @click="cfDialog.visible = true">

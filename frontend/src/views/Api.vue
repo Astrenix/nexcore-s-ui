@@ -246,7 +246,7 @@
             style="max-width: 180px"
           />
           <el-button @click="reloadLogs">
-            <el-icon><Search /></el-icon>{{ $t('actions.search', '搜索') }}
+            <el-icon><Search /></el-icon>{{ $t('actions.search') }}
           </el-button>
           <el-button @click="resetLogFilter">{{ $t('reset') }}</el-button>
           <div class="toolbar-spacer" />
@@ -469,7 +469,7 @@ const v1Endpoints = [
   { method: 'GET',    path: '/health' },
   { method: 'GET',    path: '/me' },
   { method: 'GET',    path: '/server/status' },
-  { method: 'GET',    path: '/xray/status', note: 'sing-box 状态(字段名兼容 x-ui)' },
+  { method: 'GET',    path: '/xray/status', note: i18n.global.t('api.v1note.xrayStatus') },
   { method: 'POST',   path: '/xray/restart' },
   { method: 'GET',    path: '/xray/logs' },
   { method: 'GET',    path: '/xray/config' },
@@ -500,10 +500,10 @@ const v1Endpoints = [
   { method: 'POST',   path: '/tokens' },
   { method: 'DELETE', path: '/tokens/:id' },
   { method: 'POST',   path: '/system/restart-panel' },
-  { method: 'POST',   path: '/sui/cloudflare/zones',         note: 's-ui 独有' },
-  { method: 'POST',   path: '/sui/cloudflare/dns/upsert-a',  note: 's-ui 独有' },
-  { method: 'POST',   path: '/sui/cloudflare/tls/issue',     note: 's-ui 独有' },
-  { method: 'GET',    path: '/sui/singbox/raw-config',       note: 's-ui 独有' },
+  { method: 'POST',   path: '/sui/cloudflare/zones',         note: i18n.global.t('api.v1note.suiOnly') },
+  { method: 'POST',   path: '/sui/cloudflare/dns/upsert-a',  note: i18n.global.t('api.v1note.suiOnly') },
+  { method: 'POST',   path: '/sui/cloudflare/tls/issue',     note: i18n.global.t('api.v1note.suiOnly') },
+  { method: 'GET',    path: '/sui/singbox/raw-config',       note: i18n.global.t('api.v1note.suiOnly') },
 ]
 
 const filteredDocGroups = computed(() => {

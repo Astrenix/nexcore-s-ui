@@ -13,9 +13,13 @@ type Inbound struct {
 	// AutoMigrate 给已有行回填 default 值);UI 上的 switch 开关写入此字段。
 	Enable bool `json:"enable" form:"enable" gorm:"default:true"`
 
-	// Foreign key to tls table
-	TlsId uint `json:"tls_id" form:"tls_id"`
-	Tls   *Tls `json:"tls" form:"tls" gorm:"foreignKey:TlsId;references:Id"`
+	// Foreign key to tls table.
+	// *uint(nullable):无 TLS 的入站存 NULL 而非 0 —— 这样开启 SQLite 外键
+	// (_foreign_keys=on)后,FK 对 NULL 不校验、对非空值要求 tls.id 真实存在,
+	// 既拦住孤儿引用又不误伤无 TLS 入站。历史上用 0 表示"无 TLS",而 tls 表没有
+	// id=0 的行,开 FK 会让所有无 TLS 入站 Save 报错(第一轮因此回退)。
+	TlsId *uint `json:"tls_id" form:"tls_id"`
+	Tls   *Tls  `json:"tls" form:"tls" gorm:"foreignKey:TlsId;references:Id;constraint:OnDelete:RESTRICT"`
 
 	Addrs   json.RawMessage `json:"addrs" form:"addrs"`
 	OutJson json.RawMessage `json:"out_json" form:"out_json"`
@@ -55,9 +59,14 @@ func (i *Inbound) UnmarshalJSON(data []byte) error {
 	i.Tag, _ = raw["tag"].(string)
 	delete(raw, "tag")
 
-	// TlsId
+	// TlsId:前端仍以数字 tls_id 传(0 = 无 TLS)。0 存 nil(→ DB NULL),
+	// >0 存指针,配合外键约束。
 	if val, exists := raw["tls_id"].(float64); exists {
-		i.TlsId = uint(val)
+		if id := uint(val); id > 0 {
+			i.TlsId = &id
+		} else {
+			i.TlsId = nil
+		}
 	}
 	delete(raw, "tls_id")
 	delete(raw, "tls")
@@ -105,6 +114,20 @@ func (i *Inbound) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+// HasTls 该入站是否绑定了 TLS(tls_id 非空且 >0)。
+func (i Inbound) HasTls() bool {
+	return i.TlsId != nil && *i.TlsId > 0
+}
+
+// TlsIdValue 返回 tls_id 的数值,未绑定 TLS 时返回 0 —— 用于前端契约(前端仍以
+// 数字 0 表示无 TLS)和按 id 查询。
+func (i Inbound) TlsIdValue() uint {
+	if i.TlsId == nil {
+		return 0
+	}
+	return *i.TlsId
+}
+
 // MarshalJSON customizes marshalling
 func (i Inbound) MarshalJSON() ([]byte, error) {
 	// Combine fixed fields and dynamic fields into one map
@@ -135,7 +158,7 @@ func (i Inbound) MarshalFull() (*map[string]interface{}, error) {
 	combined["type"] = i.Type
 	combined["tag"] = i.Tag
 	combined["enable"] = i.Enable
-	combined["tls_id"] = i.TlsId
+	combined["tls_id"] = i.TlsIdValue()
 	combined["addrs"] = i.Addrs
 	combined["out_json"] = i.OutJson
 	if i.Ext != "" {

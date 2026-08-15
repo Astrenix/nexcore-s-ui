@@ -3,17 +3,17 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.inbounds') }}</h2>
-        <p class="page-desc">{{ $t('inbounds.desc', '配置 Sing-Box 入站协议、监听端口与关联用户') }}</p>
+        <p class="page-desc">{{ $t('inbounds.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button type="primary" @click="showModal(0)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
         </el-button>
         <el-button :loading="refreshing" @click="refresh">
-          <el-icon><RefreshRight /></el-icon>{{ $t('actions.refresh', '刷新') }}
+          <el-icon><RefreshRight /></el-icon>{{ $t('actions.refresh') }}
         </el-button>
         <el-button v-if="inbounds.length + totalClients > 0" type="danger" plain @click="purgeAll">
-          <el-icon><Delete /></el-icon>清除全部数据
+          <el-icon><Delete /></el-icon>{{ $t('inbounds.purgeAll') }}
         </el-button>
       </div>
     </div>
@@ -27,11 +27,11 @@
       class="firewall-alert"
     >
       <template #title>
-        系统防火墙({{ firewall.tool.toUpperCase() }})阻挡入站端口:{{ blockedPorts.join(', ') }}
+        {{ $t('inbounds.firewallBlocked', { tool: firewall.tool.toUpperCase(), ports: blockedPorts.join(', ') }) }}
       </template>
       <template #default>
         <div class="firewall-alert-body">
-          客户端从外网连不进来。在服务器上执行:
+          {{ $t('inbounds.firewallHint') }}
           <code class="firewall-alert-cmd">{{ firewallFix }}</code>
         </div>
       </template>
@@ -48,7 +48,7 @@
         <span class="ov-stat__value">{{ totalClients }}</span>
       </div>
       <div class="ov-stat">
-        <span class="ov-stat__label">{{ $t('home.topTraffic.up', '上行') }} / {{ $t('home.topTraffic.down', '下行') }}</span>
+        <span class="ov-stat__label">{{ $t('home.topTraffic.up') }} / {{ $t('home.topTraffic.down') }}</span>
         <span class="ov-stat__value ov-stat__value--small">
           {{ HumanReadable.sizeFormat(totalUp) }}
           <span class="muted">/</span>
@@ -56,22 +56,22 @@
         </span>
       </div>
       <div v-if="totalUp + totalDown > 0" class="ov-stat">
-        <span class="ov-stat__label">{{ $t('stats.totalUsage', '总流量') }}</span>
+        <span class="ov-stat__label">{{ $t('stats.totalUsage') }}</span>
         <span class="ov-stat__value">{{ HumanReadable.sizeFormat(totalUp + totalDown) }}</span>
       </div>
-      <el-tooltip content="近 1.5 秒平均上行速率 — 直读 sing-box 内存累计,无延迟" placement="top">
+      <el-tooltip :content="$t('inbounds.rateUpTip')" placement="top">
         <div class="ov-stat ov-stat--rate">
-          <span class="ov-stat__label">↑ 上行</span>
+          <span class="ov-stat__label">↑ {{ $t('home.topTraffic.up') }}</span>
           <span class="ov-stat__value ov-stat__value--small">{{ rateUp }}/s</span>
         </div>
       </el-tooltip>
-      <el-tooltip content="近 1.5 秒平均下行速率" placement="top">
+      <el-tooltip :content="$t('inbounds.rateDownTip')" placement="top">
         <div class="ov-stat ov-stat--rate">
-          <span class="ov-stat__label">↓ 下行</span>
+          <span class="ov-stat__label">↓ {{ $t('home.topTraffic.down') }}</span>
           <span class="ov-stat__value ov-stat__value--small">{{ rateDown }}/s</span>
         </div>
       </el-tooltip>
-      <el-tooltip content="sing-box 当前活跃连接数 — TCP / UDP" placement="top">
+      <el-tooltip :content="$t('inbounds.connTip')" placement="top">
         <div class="ov-stat ov-stat--rate">
           <span class="ov-stat__label">TCP / UDP</span>
           <span class="ov-stat__value ov-stat__value--small mono">{{ connStats.tcp }} / {{ connStats.udp }}</span>
@@ -80,7 +80,7 @@
       <div class="ov-toolbar">
         <el-input
           v-model="filter"
-          :placeholder="$t('actions.search', '搜索 tag / 类型 / 端口')"
+          :placeholder="$t('actions.search')"
           clearable
           class="ov-search"
         >
@@ -90,7 +90,7 @@
     </div>
 
     <div v-if="inbounds.length === 0" class="empty-state nc-card">
-      <el-empty :description="$t('noData', '暂无入站')">
+      <el-empty :description="$t('noData')">
         <el-button type="primary" @click="showModal(0)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
         </el-button>
@@ -102,13 +102,13 @@
       <template #header>
         <div class="cat-head">
           <el-icon class="cat-head__icon"><User /></el-icon>
-          <span class="cat-head__title">多用户入站</span>
-          <span class="cat-head__sub">VLESS / VMess / Trojan / SS-2022 等 — 一个端口多个客户</span>
+          <span class="cat-head__title">{{ $t('inbounds.multiUser') }}</span>
+          <span class="cat-head__sub">{{ $t('inbounds.multiUserSub') }}</span>
           <span class="cat-head__count">{{ multiUser.length }}</span>
         </div>
       </template>
       <el-table :data="filtered(multiUser)" :row-key="ibRowKey" stripe size="small" class="nc-table ib-table">
-        <el-table-column :label="$t('enable', '启用')" width="68" align="center">
+        <el-table-column :label="$t('enable')" width="68" align="center">
           <template #default="{ row }">
             <el-switch
               :model-value="row.enable !== false"
@@ -127,12 +127,12 @@
             <span class="mono">{{ row.tag }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('in.port', '端口')" width="100" align="center">
+        <el-table-column :label="$t('in.port')" width="100" align="center">
           <template #default="{ row }">
             <span class="mono">{{ row.listen_port }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('inbounds.clientCount', '客户数')" width="100" align="center">
+        <el-table-column :label="$t('inbounds.clientCount')" width="100" align="center">
           <template #default="{ row }">
             <button v-if="row.users?.length" class="client-pill" @click="openClients(row)">
               <el-icon><User /></el-icon>{{ row.users.length }}
@@ -140,7 +140,7 @@
             <span v-else class="muted">0</span>
           </template>
         </el-table-column>
-        <el-table-column label="在线 IP" width="100" align="center">
+        <el-table-column :label="$t('inbounds.onlineIp')" width="100" align="center">
           <template #default="{ row }">
             <el-popover
               v-if="ipCountOf(row.tag) > 0"
@@ -156,19 +156,19 @@
               </template>
               <div class="ip-pop">
                 <div class="ip-pop__head">
-                  <b>{{ row.tag }}</b> · 60s 内 {{ ipCountOf(row.tag) }} 个独立 IP
+                  <b>{{ row.tag }}</b>{{ $t('inbounds.uniqueIps', { n: ipCountOf(row.tag) }) }}
                 </div>
-                <div v-if="inboundIpsLoading[row.tag]" class="ip-pop__loading">加载中…</div>
+                <div v-if="inboundIpsLoading[row.tag]" class="ip-pop__loading">{{ $t('loading') }}</div>
                 <div v-else-if="inboundIpsCache[row.tag]?.length" class="ip-pop__list mono">
                   <div v-for="ip in inboundIpsCache[row.tag]" :key="ip" class="ip-pop__item">{{ ip }}</div>
                 </div>
-                <div v-else class="ip-pop__empty">暂无具体 IP</div>
+                <div v-else class="ip-pop__empty">{{ $t('inbounds.noIpDetail') }}</div>
               </div>
             </el-popover>
             <span v-else class="muted">0</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('stats.totalUsage', '总流量')" min-width="170">
+        <el-table-column :label="$t('stats.totalUsage')" min-width="170">
           <template #default="{ row }">
             <span v-if="trafficOf(row.tag)" class="mono traffic-cell">
               {{ HumanReadable.sizeFormat(trafficOf(row.tag)) }}
@@ -184,7 +184,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Server 来源" width="140" align="center">
+        <el-table-column :label="$t('inbounds.addrSource')" width="140" align="center">
           <template #default="{ row }">
             <el-tooltip :content="addrSourceTooltip(row)" placement="top">
               <el-tag :type="addrSourceTag(row).type" size="small" effect="plain">
@@ -193,19 +193,19 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="中转" width="220" show-overflow-tooltip>
+        <el-table-column :label="$t('inbounds.relay')" width="220" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag v-if="relayOf(row.tag)" type="warning" size="small" effect="plain" class="mono">
               → {{ relayOf(row.tag) }}<span v-if="relayDisplayName(row.tag)" class="relay-display-name"> · {{ relayDisplayName(row.tag) }}</span>
             </el-tag>
-            <span v-else class="muted">本机出站</span>
+            <span v-else class="muted">{{ $t('inbounds.localOut') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="链路延迟" width="110" align="center">
+        <el-table-column :label="$t('inbounds.linkLatency')" width="110" align="center">
           <template #default="{ row }">
             <span v-if="!relayOf(row.tag)" class="muted">—</span>
             <el-tooltip v-else
-              :content="checkResults[relayOf(row.tag)]?.loading ? '探测中…' : (checkResults[relayOf(row.tag)]?.errorMessage || '点击重测中转链路')"
+              :content="checkResults[relayOf(row.tag)]?.loading ? $t('inbounds.probing') : (checkResults[relayOf(row.tag)]?.errorMessage || $t('inbounds.clickRetest'))"
               placement="top"
             >
               <span class="delay-cell" :class="{ 'is-clickable': !checkResults[relayOf(row.tag)]?.loading }" @click="!checkResults[relayOf(row.tag)]?.loading && manualProbe(relayOf(row.tag))">
@@ -230,11 +230,11 @@
         <el-table-column :label="$t('actions.action')" width="180" align="center">
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="openClients(row)">
-              <el-icon><User /></el-icon>客户端
+              <el-icon><User /></el-icon>{{ $t('objects.client') }}
             </el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => onMore(cmd, row)">
               <el-button size="small">
-                更多<el-icon><ArrowDown /></el-icon>
+                {{ $t('inbounds.more') }}<el-icon><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -245,10 +245,10 @@
                     <el-icon style="margin-right: 6px"><CopyDocument /></el-icon>{{ $t('actions.clone') }}
                   </el-dropdown-item>
                   <el-dropdown-item v-if="Data().enableTraffic" command="stats">
-                    <el-icon style="margin-right: 6px"><DataLine /></el-icon>{{ $t('stats.graphTitle', '流量图') }}
+                    <el-icon style="margin-right: 6px"><DataLine /></el-icon>{{ $t('stats.graphTitle') }}
                   </el-dropdown-item>
                   <el-dropdown-item command="reset" divided>
-                    <el-icon style="margin-right: 6px"><RefreshLeft /></el-icon>{{ $t('actions.resetTraffic', '重置流量') }}
+                    <el-icon style="margin-right: 6px"><RefreshLeft /></el-icon>{{ $t('actions.resetTraffic') }}
                   </el-dropdown-item>
                   <el-dropdown-item command="del" divided>
                     <el-icon style="margin-right: 6px; color: var(--nc-danger)"><Delete /></el-icon>
@@ -267,13 +267,13 @@
       <template #header>
         <div class="cat-head">
           <el-icon class="cat-head__icon"><Connection /></el-icon>
-          <span class="cat-head__title">单用户入站</span>
-          <span class="cat-head__sub">Direct / Mixed / Socks / HTTP / Tun / Naive — 端口本身就是入口</span>
+          <span class="cat-head__title">{{ $t('inbounds.singleUser') }}</span>
+          <span class="cat-head__sub">{{ $t('inbounds.singleUserSub') }}</span>
           <span class="cat-head__count">{{ singleUser.length }}</span>
         </div>
       </template>
       <el-table :data="filtered(singleUser)" :row-key="ibRowKey" stripe size="small" class="nc-table ib-table">
-        <el-table-column :label="$t('enable', '启用')" width="68" align="center">
+        <el-table-column :label="$t('enable')" width="68" align="center">
           <template #default="{ row }">
             <el-switch
               :model-value="row.enable !== false"
@@ -292,12 +292,12 @@
             <span class="mono">{{ row.tag }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('in.addr', '监听')" min-width="180" show-overflow-tooltip>
+        <el-table-column :label="$t('in.addr')" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="mono">{{ row.listen || '0.0.0.0' }}<span class="port">:{{ row.listen_port }}</span></span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('stats.totalUsage', '总流量')" min-width="170">
+        <el-table-column :label="$t('stats.totalUsage')" min-width="170">
           <template #default="{ row }">
             <span v-if="trafficOf(row.tag)" class="mono traffic-cell">
               {{ HumanReadable.sizeFormat(trafficOf(row.tag)) }}
@@ -306,7 +306,7 @@
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="Server 来源" width="140" align="center">
+        <el-table-column :label="$t('inbounds.addrSource')" width="140" align="center">
           <template #default="{ row }">
             <el-tooltip :content="addrSourceTooltip(row)" placement="top">
               <el-tag :type="addrSourceTag(row).type" size="small" effect="plain">
@@ -315,19 +315,19 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="中转" width="220" show-overflow-tooltip>
+        <el-table-column :label="$t('inbounds.relay')" width="220" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag v-if="relayOf(row.tag)" type="warning" size="small" effect="plain" class="mono">
               → {{ relayOf(row.tag) }}<span v-if="relayDisplayName(row.tag)" class="relay-display-name"> · {{ relayDisplayName(row.tag) }}</span>
             </el-tag>
-            <span v-else class="muted">本机出站</span>
+            <span v-else class="muted">{{ $t('inbounds.localOut') }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="链路延迟" width="110" align="center">
+        <el-table-column :label="$t('inbounds.linkLatency')" width="110" align="center">
           <template #default="{ row }">
             <span v-if="!relayOf(row.tag)" class="muted">—</span>
             <el-tooltip v-else
-              :content="checkResults[relayOf(row.tag)]?.loading ? '探测中…' : (checkResults[relayOf(row.tag)]?.errorMessage || '点击重测中转链路')"
+              :content="checkResults[relayOf(row.tag)]?.loading ? $t('inbounds.probing') : (checkResults[relayOf(row.tag)]?.errorMessage || $t('inbounds.clickRetest'))"
               placement="top"
             >
               <span class="delay-cell" :class="{ 'is-clickable': !checkResults[relayOf(row.tag)]?.loading }" @click="!checkResults[relayOf(row.tag)]?.loading && manualProbe(relayOf(row.tag))">
@@ -354,11 +354,11 @@
             <!-- 单用户卡现在只剩 direct/tun/redirect/tproxy 等"端口=入口"协议,
                  没有凭证概念,主按钮就是编辑 -->
             <el-button size="small" @click="showModal(row.id)">
-              <el-icon><Edit /></el-icon>编辑
+              <el-icon><Edit /></el-icon>{{ $t('actions.edit') }}
             </el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => onMore(cmd, row)">
               <el-button size="small">
-                更多<el-icon><ArrowDown /></el-icon>
+                {{ $t('inbounds.more') }}<el-icon><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -366,10 +366,10 @@
                     <el-icon style="margin-right: 6px"><CopyDocument /></el-icon>{{ $t('actions.clone') }}
                   </el-dropdown-item>
                   <el-dropdown-item v-if="Data().enableTraffic" command="stats">
-                    <el-icon style="margin-right: 6px"><DataLine /></el-icon>{{ $t('stats.graphTitle', '流量图') }}
+                    <el-icon style="margin-right: 6px"><DataLine /></el-icon>{{ $t('stats.graphTitle') }}
                   </el-dropdown-item>
                   <el-dropdown-item command="reset" divided>
-                    <el-icon style="margin-right: 6px"><RefreshLeft /></el-icon>{{ $t('actions.resetTraffic', '重置流量') }}
+                    <el-icon style="margin-right: 6px"><RefreshLeft /></el-icon>{{ $t('actions.resetTraffic') }}
                   </el-dropdown-item>
                   <el-dropdown-item command="del" divided>
                     <el-icon style="margin-right: 6px; color: var(--nc-danger)"><Delete /></el-icon>
@@ -489,8 +489,8 @@ const relayOf = (tag: string): string => {
 // addrSourceTag — 给入站列表「Server 来源」列出显示标签 + tag 颜色。
 // 优先级:row.link_addr_source(入站级)→ effective_addr_source(后端 resolve)→ panel(兜底)
 const ADDR_SRC_LABEL: Record<string, string> = {
-  panel: '面板域名',
-  ip: '服务器 IP',
+  panel: i18n.global.t('inbounds.addrSrc.panel'),
+  ip: i18n.global.t('inbounds.addrSrc.ip'),
   tls: 'TLS server_name',
 }
 const ADDR_SRC_TYPE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'primary'> = {
@@ -503,15 +503,15 @@ const addrSourceTag = (row: any): { label: string; type: 'success' | 'warning' |
   const eff = (row?.effective_addr_source ?? 'panel').trim()
   if (!inb) {
     // 跟随全局 — 标签前缀 "全局·" 让用户明确这是 fallback
-    return { label: '全局·' + (ADDR_SRC_LABEL[eff] ?? eff), type: 'primary' }
+    return { label: i18n.global.t('inbounds.globalPrefix') + (ADDR_SRC_LABEL[eff] ?? eff), type: 'primary' }
   }
   return { label: ADDR_SRC_LABEL[inb] ?? inb, type: ADDR_SRC_TYPE[inb] ?? 'info' }
 }
 const addrSourceTooltip = (row: any): string => {
   const inb = (row?.link_addr_source ?? '').trim()
   const eff = (row?.effective_addr_source ?? 'panel').trim()
-  if (!inb) return `跟随全局设置(当前生效:${ADDR_SRC_LABEL[eff] ?? eff});改入站编辑里的「分享链接 server 字段来源」覆盖`
-  return `本入站已单独覆盖为:${ADDR_SRC_LABEL[inb] ?? inb}`
+  if (!inb) return i18n.global.t('inbounds.followGlobalTip', { label: ADDR_SRC_LABEL[eff] ?? eff })
+  return i18n.global.t('inbounds.overriddenTip', { label: ADDR_SRC_LABEL[inb] ?? inb })
 }
 
 // v1.7.26:tag 命名空间合并查找,先 outbounds 表(用户手配),再 pool_outbounds(订阅池)。
@@ -571,7 +571,7 @@ const onMore = (cmd: string, row: any) => {
 const confirmDel = async (row: any) => {
   try {
     await ElMessageBox.confirm(
-      `确认删除入站 ${row.tag}(${row.type})?引用此入站的客户会被解绑。`,
+      i18n.global.t('inbounds.delConfirm', { tag: row.tag, type: row.type }),
       i18n.global.t('actions.del'),
       { type: 'warning', confirmButtonText: i18n.global.t('yes'), cancelButtonText: i18n.global.t('no') },
     )
@@ -602,10 +602,9 @@ const purgeAll = async () => {
   const cliCount = (Data().clients ?? []).length
   try {
     await ElMessageBox.confirm(
-      `确认清除全部 ${ibCount} 个入站 + ${cliCount} 个客户端?\n` +
-      `sing-box 重启后所有连接立即失效,流量历史一并删除,无法恢复。`,
-      '清除全部数据',
-      { type: 'error', confirmButtonText: '确认清除', cancelButtonText: i18n.global.t('no') },
+      i18n.global.t('inbounds.purgeConfirm', { ib: ibCount, cli: cliCount }),
+      i18n.global.t('inbounds.purgeAll'),
+      { type: 'error', confirmButtonText: i18n.global.t('inbounds.purgeConfirmBtn'), cancelButtonText: i18n.global.t('no') },
     )
   } catch { return }
 
@@ -625,20 +624,20 @@ const purgeAll = async () => {
   }
   await loadTraffic()
 
-  ElMessage.success(`已清除 ${ibCount} 个入站 + ${cliCount} 个客户端`)
+  ElMessage.success(i18n.global.t('inbounds.purgeDone', { ib: ibCount, cli: cliCount }))
 }
 
 const resetTraffic = async (row: any) => {
   try {
     await ElMessageBox.confirm(
-      `重置入站「${row.tag}」的累计流量?(关联客户的 per-user 流量不受影响)`,
-      i18n.global.t('actions.resetTraffic', '重置流量'),
-      { type: 'warning', confirmButtonText: '重置', cancelButtonText: i18n.global.t('no') },
+      i18n.global.t('inbounds.resetConfirm', { tag: row.tag }),
+      i18n.global.t('actions.resetTraffic'),
+      { type: 'warning', confirmButtonText: i18n.global.t('reset'), cancelButtonText: i18n.global.t('no') },
     )
   } catch { return }
   const r = await HttpUtils.post('api/resetTraffic', { resource: 'inbound', tag: row.tag })
   if (r.success) {
-    ElMessage.success('已重置')
+    ElMessage.success(i18n.global.t('inbounds.resetDone'))
     await loadTraffic()
   }
 }

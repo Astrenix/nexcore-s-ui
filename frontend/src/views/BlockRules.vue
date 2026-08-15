@@ -3,14 +3,14 @@
     <div class="page-header with-actions">
       <div class="page-header-text">
         <h2 class="page-title">{{ $t('pages.blockRules') }}</h2>
-        <p class="page-desc">独立的快捷屏蔽规则模块 — 命中即 reject(高优先级,生效在路由列表之前)。备注以「[NexCore]」开头的规则由主控批量下发,本地禁止编辑;其它备注是节点本地手加,可自由增删改。</p>
+        <p class="page-desc">{{ $t('blockrule.desc') }}</p>
       </div>
       <div class="page-header-actions">
         <el-button @click="loadList" :loading="loading">
-          <el-icon><Refresh /></el-icon>{{ $t('actions.refresh', '刷新') }}
+          <el-icon><Refresh /></el-icon>{{ $t('actions.refresh') }}
         </el-button>
         <el-button @click="presetsVisible = true">
-          <el-icon><MagicStick /></el-icon>应用预置
+          <el-icon><MagicStick /></el-icon>{{ $t('blockrule.applyPresets') }}
         </el-button>
         <el-button type="primary" @click="openEdit(null)">
           <el-icon><Plus /></el-icon>{{ $t('actions.add') }}
@@ -20,7 +20,7 @@
 
     <div class="nc-card">
       <el-table :data="rules" stripe>
-        <el-table-column label="启用" width="80">
+        <el-table-column :label="$t('enable')" width="80">
           <template #default="{ row }">
             <el-switch
               :model-value="row.enable"
@@ -29,37 +29,37 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="110">
+        <el-table-column prop="type" :label="$t('type')" width="110">
           <template #default="{ row }">
             <span class="type-pill">{{ row.type }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="value" label="值" min-width="220" show-overflow-tooltip>
+        <el-table-column prop="value" :label="$t('objects.value')" min-width="220" show-overflow-tooltip>
           <template #default="{ row }"><span class="mono">{{ row.value }}</span></template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="180">
+        <el-table-column prop="remark" :label="$t('in.remark')" min-width="180">
           <template #default="{ row }">
-            <span v-if="isManaged(row)" class="managed-tag">主控</span>{{ stripNexcorePrefix(row.remark) }}
+            <span v-if="isManaged(row)" class="managed-tag">{{ $t('blockrule.managed') }}</span>{{ stripNexcorePrefix(row.remark) }}
           </template>
         </el-table-column>
-        <el-table-column prop="inboundTag" label="入站 tag" width="140">
+        <el-table-column prop="inboundTag" :label="$t('blockrule.inboundTag')" width="140">
           <template #default="{ row }">
             <span v-if="row.inboundTag" class="mono">{{ row.inboundTag }}</span>
-            <span v-else class="muted">全局</span>
+            <span v-else class="muted">{{ $t('blockrule.global') }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="170">
+        <el-table-column prop="createdAt" :label="$t('blockrule.createdAt')" width="170">
           <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="center">
+        <el-table-column :label="$t('actions.action')" width="120" align="center">
           <template #default="{ row }">
-            <el-tooltip content="编辑" placement="top">
+            <el-tooltip :content="$t('actions.edit')" placement="top">
               <el-button text :disabled="isManaged(row)" @click="openEdit(row)">
                 <el-icon><Edit /></el-icon>
               </el-button>
             </el-tooltip>
             <el-popconfirm
-              :title="`确定删除该屏蔽规则?`"
+              :title="$t('blockrule.delConfirm')"
               :confirm-button-text="$t('yes')"
               :cancel-button-text="$t('no')"
               @confirm="delRule(row.id!)"
@@ -73,45 +73,45 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="rules.length === 0 && !loading" description="暂无屏蔽规则。点「应用预置」可一键导入,或点「新增」自定义" />
+      <el-empty v-if="rules.length === 0 && !loading" :description="$t('blockrule.empty')" />
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editing.id ? '编辑屏蔽规则' : '新增屏蔽规则'" width="540px">
+    <el-dialog v-model="dialogVisible" :title="editing.id ? $t('blockrule.editTitle') : $t('blockrule.addTitle')" width="540px">
       <el-form :model="editing" label-width="86px">
-        <el-form-item label="类型" required>
+        <el-form-item :label="$t('type')" required>
           <el-select v-model="editing.type">
             <el-option v-for="t in typeOptions" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="值" required>
-          <el-input v-model="editing.value" placeholder="多个值用英文逗号分隔" />
+        <el-form-item :label="$t('objects.value')" required>
+          <el-input v-model="editing.value" :placeholder="$t('blockrule.valuePlaceholder')" />
           <span class="form-hint">{{ valueHint }}</span>
         </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="editing.remark" placeholder="给自己看的说明,空也行" />
+        <el-form-item :label="$t('in.remark')">
+          <el-input v-model="editing.remark" :placeholder="$t('blockrule.remarkPlaceholder')" />
         </el-form-item>
-        <el-form-item label="入站 tag">
-          <el-input v-model="editing.inboundTag" placeholder="留空 = 全部入站生效" />
-          <span class="form-hint">填某入站 tag 后,本规则只对该入站流量生效;留空则全局拦截</span>
+        <el-form-item :label="$t('blockrule.inboundTag')">
+          <el-input v-model="editing.inboundTag" :placeholder="$t('blockrule.inboundTagPlaceholder')" />
+          <span class="form-hint">{{ $t('blockrule.inboundTagHint') }}</span>
         </el-form-item>
-        <el-form-item label="启用">
+        <el-form-item :label="$t('enable')">
           <el-switch v-model="editing.enable" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveRule">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ $t('actions.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="saveRule">{{ $t('actions.save') }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="presetsVisible" title="应用预置规则" width="560px">
-      <p class="preset-tip">每点一次「导入」会新增对应的规则到列表。已存在同样规则不会自动去重。</p>
+    <el-dialog v-model="presetsVisible" :title="$t('blockrule.presetsTitle')" width="560px">
+      <p class="preset-tip">{{ $t('blockrule.presetsTip') }}</p>
       <div class="presets-grid">
         <div v-for="p in presets" :key="p.key" class="preset-card">
           <h4>{{ p.name }}</h4>
           <p>{{ p.description }}</p>
           <el-button type="primary" plain :loading="presetApplying === p.key" @click="applyPreset(p)">
-            <el-icon><Plus /></el-icon>导入
+            <el-icon><Plus /></el-icon>{{ $t('blockrule.import') }}
           </el-button>
         </div>
       </div>
@@ -124,6 +124,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Plus, Edit, Delete, Refresh, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import HttpUtils from '@/plugins/httputil'
+import { i18n } from '@/locales'
 
 interface BlockRule {
   id?: number
@@ -155,46 +156,46 @@ const presetsVisible = ref(false)
 const editing = ref<BlockRule>(emptyRule())
 
 const typeOptions = [
-  { value: 'domain',   label: 'domain — 域名(包含子域)' },
-  { value: 'ip',       label: 'ip — IP / CIDR' },
-  { value: 'geosite',  label: 'geosite — geosite 数据集 tag' },
-  { value: 'geoip',    label: 'geoip — geoip 数据集 tag' },
-  { value: 'port',     label: 'port — 端口号' },
-  { value: 'protocol', label: 'protocol — 嗅探协议(tls/http/quic)' },
-  { value: 'source',   label: 'source — 源 IP / CIDR' },
+  { value: 'domain',   label: i18n.global.t('blockrule.type.domain') },
+  { value: 'ip',       label: i18n.global.t('blockrule.type.ip') },
+  { value: 'geosite',  label: i18n.global.t('blockrule.type.geosite') },
+  { value: 'geoip',    label: i18n.global.t('blockrule.type.geoip') },
+  { value: 'port',     label: i18n.global.t('blockrule.type.port') },
+  { value: 'protocol', label: i18n.global.t('blockrule.type.protocol') },
+  { value: 'source',   label: i18n.global.t('blockrule.type.source') },
 ]
 
 // 预置跟 v1 后端的 listBlockRulePresets 对齐(database/model/block_rule.go 注释)
 const presets: Preset[] = [
   {
     key: 'ads',
-    name: '屏蔽广告(geosite-category-ads-all)',
-    description: '命中所有广告 + 反欺诈域名,推荐启用',
-    rules: [{ type: 'geosite', value: 'category-ads-all', remark: '屏蔽广告', inboundTag: '', enable: true }],
+    name: i18n.global.t('blockrule.preset.adsName'),
+    description: i18n.global.t('blockrule.preset.adsDesc'),
+    rules: [{ type: 'geosite', value: 'category-ads-all', remark: i18n.global.t('blockrule.preset.adsRemark'), inboundTag: '', enable: true }],
   },
   {
     key: 'tracker',
-    name: '屏蔽追踪器',
-    description: '命中常见 analytics / tracker 域名',
-    rules: [{ type: 'geosite', value: 'category-public-tracker', remark: '屏蔽追踪器', inboundTag: '', enable: true }],
+    name: i18n.global.t('blockrule.preset.trackerName'),
+    description: i18n.global.t('blockrule.preset.trackerDesc'),
+    rules: [{ type: 'geosite', value: 'category-public-tracker', remark: i18n.global.t('blockrule.preset.trackerRemark'), inboundTag: '', enable: true }],
   },
   {
     key: 'porn',
-    name: '屏蔽成人内容(geosite-category-porn)',
-    description: '命中成人内容域名;部分场景(家庭/学校网络)需要',
-    rules: [{ type: 'geosite', value: 'category-porn', remark: '屏蔽成人内容', inboundTag: '', enable: true }],
+    name: i18n.global.t('blockrule.preset.pornName'),
+    description: i18n.global.t('blockrule.preset.pornDesc'),
+    rules: [{ type: 'geosite', value: 'category-porn', remark: i18n.global.t('blockrule.preset.pornRemark'), inboundTag: '', enable: true }],
   },
 ]
 
 const valueHint = computed(() => {
   switch (editing.value.type) {
-    case 'domain':   return '示例:example.com,ads.com (sing-box 按 domain_suffix 处理,含子域)'
-    case 'ip':       return '示例:1.2.3.4,10.0.0.0/8'
-    case 'geosite':  return '示例:category-ads-all,cn (sing-box geosite tag)'
-    case 'geoip':    return '示例:cn,private (sing-box geoip tag)'
-    case 'port':     return '示例:80,443,8080(整数)'
-    case 'protocol': return '示例:tls,http,quic (sing-box sniff 后协议名)'
-    case 'source':   return '示例:192.168.1.0/24'
+    case 'domain':   return i18n.global.t('blockrule.hint.domain')
+    case 'ip':       return i18n.global.t('blockrule.hint.ip')
+    case 'geosite':  return i18n.global.t('blockrule.hint.geosite')
+    case 'geoip':    return i18n.global.t('blockrule.hint.geoip')
+    case 'port':     return i18n.global.t('blockrule.hint.port')
+    case 'protocol': return i18n.global.t('blockrule.hint.protocol')
+    case 'source':   return i18n.global.t('blockrule.hint.source')
     default:         return ''
   }
 })
@@ -242,12 +243,12 @@ const saveAction = async (action: 'new' | 'edit' | 'del', data: any): Promise<bo
 }
 
 const saveRule = async () => {
-  if (!editing.value.value.trim()) return ElMessage.error('值不能为空')
+  if (!editing.value.value.trim()) return ElMessage.error(i18n.global.t('blockrule.valueRequired'))
   saving.value = true
   try {
     const ok = await saveAction(editing.value.id ? 'edit' : 'new', editing.value)
     if (ok) {
-      ElMessage.success(editing.value.id ? '已更新,sing-box 后台 reload' : '已新增,sing-box 后台 reload')
+      ElMessage.success(editing.value.id ? i18n.global.t('blockrule.updated') : i18n.global.t('blockrule.added'))
       dialogVisible.value = false
       await loadList()
     }
@@ -258,7 +259,7 @@ const saveRule = async () => {
 
 const delRule = async (id: number) => {
   if (await saveAction('del', [id])) {
-    ElMessage.success('已删除')
+    ElMessage.success(i18n.global.t('blockrule.deleted'))
     await loadList()
   }
 }
@@ -269,7 +270,7 @@ const toggleEnable = async (r: BlockRule, val: boolean) => {
     const ok = await saveAction('edit', { ...r, enable: val })
     if (ok) {
       r.enable = val
-      ElMessage.success(val ? '已启用' : '已禁用')
+      ElMessage.success(val ? i18n.global.t('blockrule.enabled') : i18n.global.t('blockrule.disabled'))
     }
   } finally {
     togglingId.value = null
@@ -283,7 +284,7 @@ const applyPreset = async (p: Preset) => {
     for (const r of p.rules) {
       if (await saveAction('new', r)) okCount++
     }
-    ElMessage.success(`已导入 ${okCount} 条规则`)
+    ElMessage.success(i18n.global.t('blockrule.imported', { n: okCount }))
     presetsVisible.value = false
     await loadList()
   } finally {

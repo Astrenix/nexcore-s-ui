@@ -20,8 +20,8 @@
           <div class="type-picker">
             <div class="type-group">
               <span class="type-group__label">
-                <span class="type-cap cap-multi">多用户</span>
-                一端口多客户(独立凭据 / 流量 / 到期)
+                <span class="type-cap cap-multi">{{ $t('inbound.multiUser') }}</span>
+                {{ $t('inbound.multiUserHint') }}
               </span>
               <div class="type-chips">
                 <button
@@ -36,8 +36,8 @@
             </div>
             <div class="type-group">
               <span class="type-group__label">
-                <span class="type-cap cap-single">单用户</span>
-                端口即入口(SOCKS/HTTP 本地代理 · Direct 端口转发 · Tun 网卡级代理)
+                <span class="type-cap cap-single">{{ $t('inbound.singleUser') }}</span>
+                {{ $t('inbound.singleUserHint') }}
               </span>
               <div class="type-chips">
                 <button
@@ -54,11 +54,11 @@
         </el-form-item>
         <div class="form-row form-item--full">
           <el-form-item :label="$t('objects.tag')" class="form-row__item">
-            <el-input v-model="inbound.tag" :disabled="title === 'edit'" placeholder="字母数字 . _ -" />
+            <el-input v-model="inbound.tag" :disabled="title === 'edit'" :placeholder="$t('inbound.tagPlaceholder')" />
           </el-form-item>
           <template v-if="inbound.type !== InTypes.Tun">
             <el-form-item :label="$t('in.addr')" class="form-row__item">
-              <el-input v-model="inbound.listen" placeholder="::  (全部接口)" />
+              <el-input v-model="inbound.listen" :placeholder="$t('inbound.listenPlaceholder')" />
             </el-form-item>
             <el-form-item :label="$t('in.port')" class="form-row__item">
               <div class="port-input">
@@ -70,35 +70,35 @@
                   class="port-input__num"
                   :class="{ 'is-conflict': !!portConflict }"
                 />
-                <el-tooltip content="重抽空闲端口" placement="top">
+                <el-tooltip :content="$t('inbound.reseedPort')" placement="top">
                   <button type="button" class="port-input__btn" @click="reseedPort">
                     <el-icon><Refresh /></el-icon>
                   </button>
                 </el-tooltip>
               </div>
-              <p v-if="portConflict" class="form-warn">端口 {{ inbound.listen_port }} 已被入站「{{ portConflict }}」占用</p>
+              <p v-if="portConflict" class="form-warn">{{ $t('inbound.portConflict', { port: inbound.listen_port, tag: portConflict }) }}</p>
             </el-form-item>
           </template>
         </div>
         <el-form-item v-if="hasTls" :label="$t('objects.tls')">
           <div class="tls-row">
-            <el-select v-model="inbound.tls_id" clearable :placeholder="onlyTls ? '此协议必须启用 TLS' : $t('disable')" class="tls-row__select">
+            <el-select v-model="inbound.tls_id" clearable :placeholder="onlyTls ? $t('inbound.tlsRequired') : $t('disable')" class="tls-row__select">
               <el-option :value="0" :label="$t('disable')" :disabled="onlyTls" />
               <el-option v-for="t in tlsConfigs" :key="t.id" :value="t.id" :label="t.name" />
             </el-select>
-            <el-tooltip content="通过 Cloudflare 自动签发新证书" placement="top">
+            <el-tooltip :content="$t('inbound.cfIssueTip')" placement="top">
               <el-button type="primary" plain class="tls-row__btn" @click="openCfWizard">
-                <el-icon><MagicStick /></el-icon>自动签发
+                <el-icon><MagicStick /></el-icon>{{ $t('inbound.autoIssue') }}
               </el-button>
             </el-tooltip>
           </div>
-          <p v-if="onlyTls && !inbound.tls_id" class="form-warn">{{ inbound.type }} 协议必须配置 TLS,点「自动签发」一键生成或去 TLS 设置页创建。</p>
+          <p v-if="onlyTls && !inbound.tls_id" class="form-warn">{{ $t('inbound.tlsRequiredHint', { type: inbound.type }) }}</p>
         </el-form-item>
         <!-- 中转目标(虚拟字段 — 实际写入 route.rules 一条 binding) -->
-        <el-form-item label="中转目标(可选)">
-          <el-select v-model="defaultOutbound" filterable placeholder="本机按全局路由出公网(不中转)" style="width: 100%">
-            <el-option value="inherit" label="本机按全局路由出公网(不中转)" />
-            <el-option-group v-if="manualProxyOutbounds.length" label="转发到落地节点(用户手配)">
+        <el-form-item :label="$t('inbound.relayTarget')">
+          <el-select v-model="defaultOutbound" filterable :placeholder="$t('inbound.noRelay')" style="width: 100%">
+            <el-option value="inherit" :label="$t('inbound.noRelay')" />
+            <el-option-group v-if="manualProxyOutbounds.length" :label="$t('inbound.relayToManual')">
               <el-option
                 v-for="o in manualProxyOutbounds"
                 :key="o.tag"
@@ -106,7 +106,7 @@
                 :label="o.display_name ? `→ ${o.tag} · ${o.display_name}` : `→ ${o.tag}`"
               />
             </el-option-group>
-            <el-option-group v-if="poolProxyOutbounds.length" label="转发到订阅池(按国家自动维护 winner)">
+            <el-option-group v-if="poolProxyOutbounds.length" :label="$t('inbound.relayToPool')">
               <el-option
                 v-for="o in poolProxyOutbounds"
                 :key="o.tag"
@@ -114,7 +114,7 @@
                 :label="o.display_name ? `🌐 ${o.tag} · ${o.display_name}` : `🌐 ${o.tag}`"
               />
             </el-option-group>
-            <el-option-group v-if="endpointOutbounds.length" label="转发到虚拟网卡端点">
+            <el-option-group v-if="endpointOutbounds.length" :label="$t('inbound.relayToEndpoint')">
               <el-option v-for="e in endpointOutbounds" :key="e.tag" :value="e.tag">
                 <span>→ {{ e.tag }}</span>
                 <span v-if="endpointPurpose(e.type)" class="opt-suffix">{{ endpointPurpose(e.type) }}</span>
@@ -122,53 +122,53 @@
             </el-option-group>
           </el-select>
           <p class="form-hint">
-            选了落地出站 = <b>中转模式</b>:用户 → 本机入站 → <span class="mono">{{ defaultOutbound !== 'inherit' && defaultOutbound !== 'direct' ? defaultOutbound : '...' }}</span> → 公网。
-            本机不落地,流量转给落地节点出公网,常用于前置加速 / 隐藏落地 IP。
-            底层是在 route.rules 最前插一条 <span class="mono">{ inbound: ["{{ inbound.tag || '...' }}"], outbound: "..." }</span>,改名 / 删除入站自动同步。
+            {{ $t('inbound.relayHint1') }}<b>{{ $t('inbound.relayMode') }}</b>{{ $t('inbound.relayHint2') }}<span class="mono">{{ defaultOutbound !== 'inherit' && defaultOutbound !== 'direct' ? defaultOutbound : '...' }}</span>{{ $t('inbound.relayHint3') }}
+            {{ $t('inbound.relayHint4') }}
+            {{ $t('inbound.relayHint5') }}<span class="mono">{ inbound: ["{{ inbound.tag || '...' }}"], outbound: "..." }</span>{{ $t('inbound.relayHint6') }}
           </p>
         </el-form-item>
 
         <!-- 入站级覆盖全局 linkAddrSource — 不同入站可走不同 server 字段策略 -->
-        <el-form-item label="分享链接 server 字段来源(本入站)" class="form-item--full">
+        <el-form-item :label="$t('inbound.addrSourceLabel')" class="form-item--full">
           <el-radio-group v-model="inbound.link_addr_source">
-            <el-radio value="">跟随全局</el-radio>
-            <el-radio value="panel">面板域名</el-radio>
-            <el-radio value="ip">服务器 IP</el-radio>
+            <el-radio value="">{{ $t('inbound.followGlobal') }}</el-radio>
+            <el-radio value="panel">{{ $t('inbounds.addrSrc.panel') }}</el-radio>
+            <el-radio value="ip">{{ $t('inbounds.addrSrc.ip') }}</el-radio>
             <el-radio value="tls">TLS server_name</el-radio>
           </el-radio-group>
           <p class="form-hint">
-            <b>跟随全局</b>(默认)— 用「设置 → 分享链接 server 字段来源」选的;<br>
-            <b>面板域名 / IP / TLS</b> — 单独覆盖,跟全局取值相同语义。<br>
-            常见用法:个别 vless+ws 入站走 CF(选「面板域名」),个别 anytls 入站绕开 CF 直连源(选「服务器 IP」)。
+            <b>{{ $t('inbound.followGlobal') }}</b>{{ $t('inbound.addrSrcHint1') }}<br>
+            <b>{{ $t('inbound.addrSrcAllBold') }}</b>{{ $t('inbound.addrSrcHint2') }}<br>
+            {{ $t('inbound.addrSrcHint3') }}
           </p>
         </el-form-item>
       </div>
 
       <!-- 协议专属字段(凭据 / 参数) -->
       <div v-if="hasProtocolFields" class="form-section">
-        <h4 class="form-section__title">协议参数</h4>
+        <h4 class="form-section__title">{{ $t('inbound.protocolParams') }}</h4>
         <div class="form-grid">
           <!-- Shadowsocks 单用户/多用户 -->
           <template v-if="inbound.type === 'shadowsocks'">
-            <el-form-item label="加密方法">
+            <el-form-item :label="$t('inbound.ssMethod')">
               <el-select v-model="inbound.method" filterable @change="onSsMethodChange">
                 <el-option v-for="m in SS_METHODS" :key="m" :label="m" :value="m" />
               </el-select>
             </el-form-item>
-            <el-form-item :label="ssIs2022 ? '密钥 (Server PSK · base64)' : '密码'">
+            <el-form-item :label="ssIs2022 ? $t('inbound.ssKey') : $t('types.pw')">
               <el-input v-model="inbound.password" type="password" show-password autocomplete="new-password" class="mono">
                 <template #append>
                   <el-tooltip
-                    :content="ssIs2022 ? `生成 ${ssPskBytes} 字节随机 PSK(base64)` : '生成随机密码'"
+                    :content="ssIs2022 ? $t('inbound.genPsk', { n: ssPskBytes }) : $t('inbound.genRandomPw')"
                     placement="top"
                   >
                     <el-button @click="genSsPassword"><el-icon><Refresh /></el-icon></el-button>
                   </el-tooltip>
                 </template>
               </el-input>
-              <p v-if="ssIs2022" class="form-hint">2022 系算法的 password 是 base64 编码的 PSK,长度必须 = {{ ssPskBytes }} 字节(对应 base64 字符串 24 / 44 长度)。点 🔄 自动生成。</p>
+              <p v-if="ssIs2022" class="form-hint">{{ $t('inbound.ssPskHint', { n: ssPskBytes }) }}</p>
             </el-form-item>
-            <el-form-item label="网络">
+            <el-form-item :label="$t('network')">
               <el-select v-model="inbound.network" clearable placeholder="tcp + udp">
                 <el-option label="tcp" value="tcp" />
                 <el-option label="udp" value="udp" />
@@ -178,77 +178,77 @@
 
           <!-- ShadowTLS -->
           <template v-if="inbound.type === 'shadowtls'">
-            <el-form-item label="版本">
+            <el-form-item :label="$t('inbound.version')">
               <el-select v-model="inbound.version">
                 <el-option :label="3" :value="3" />
                 <el-option :label="2" :value="2" />
                 <el-option :label="1" :value="1" />
               </el-select>
             </el-form-item>
-            <el-form-item v-if="inbound.version < 3" label="密码">
+            <el-form-item v-if="inbound.version < 3" :label="$t('types.pw')">
               <el-input v-model="inbound.password" type="password" show-password />
             </el-form-item>
-            <el-form-item label="握手目标 server">
-              <el-input v-model="inbound.handshake.server" placeholder="例 cloud.tencent.com" />
+            <el-form-item :label="$t('inbound.handshakeServer')">
+              <el-input v-model="inbound.handshake.server" :placeholder="$t('inbound.handshakeServerPlaceholder')" />
             </el-form-item>
-            <el-form-item label="握手目标端口">
+            <el-form-item :label="$t('inbound.handshakePort')">
               <el-input-number v-model="inbound.handshake.server_port" :min="1" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
           </template>
 
           <!-- Hysteria(v1) -->
           <template v-if="inbound.type === 'hysteria'">
-            <el-form-item label="上行 Mbps">
+            <el-form-item :label="$t('inbound.upMbps')">
               <el-input-number v-model="inbound.up_mbps" :min="1" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="下行 Mbps">
+            <el-form-item :label="$t('inbound.downMbps')">
               <el-input-number v-model="inbound.down_mbps" :min="1" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="混淆密码(obfs)">
-              <el-input v-model="inbound.obfs" placeholder="可选,留空 = 不混淆" />
+            <el-form-item :label="$t('inbound.obfsPassword')">
+              <el-input v-model="inbound.obfs" :placeholder="$t('inbound.obfsPlaceholder')" />
             </el-form-item>
           </template>
 
           <!-- Hysteria2 -->
           <template v-if="inbound.type === 'hysteria2'">
-            <el-form-item label="上行 Mbps(0 = 不限速)">
+            <el-form-item :label="$t('inbound.upMbpsNoLimit')">
               <el-input-number v-model="inbound.up_mbps" :min="0" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="下行 Mbps(0 = 不限速)">
+            <el-form-item :label="$t('inbound.downMbpsNoLimit')">
               <el-input-number v-model="inbound.down_mbps" :min="0" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="混淆密码(salamander)">
-              <el-input :model-value="inbound.obfs?.password ?? ''" placeholder="可选" @input="(v: string) => setHy2Obfs(v)" />
+            <el-form-item :label="$t('inbound.obfsSalamander')">
+              <el-input :model-value="inbound.obfs?.password ?? ''" :placeholder="$t('inbound.optional')" @input="(v: string) => setHy2Obfs(v)" />
             </el-form-item>
-            <el-form-item label="忽略客户端带宽申报">
+            <el-form-item :label="$t('inbound.ignoreClientBw')">
               <el-switch v-model="inbound.ignore_client_bandwidth" />
             </el-form-item>
           </template>
 
           <!-- Tuic -->
           <template v-if="inbound.type === 'tuic'">
-            <el-form-item label="拥塞控制">
+            <el-form-item :label="$t('inbound.congestionControl')">
               <el-select v-model="inbound.congestion_control">
                 <el-option label="cubic" value="cubic" />
                 <el-option label="new_reno" value="new_reno" />
                 <el-option label="bbr" value="bbr" />
               </el-select>
             </el-form-item>
-            <el-form-item label="鉴权超时">
+            <el-form-item :label="$t('inbound.authTimeout')">
               <el-input v-model="inbound.auth_timeout" placeholder="3s" />
             </el-form-item>
-            <el-form-item label="心跳间隔">
+            <el-form-item :label="$t('inbound.heartbeat')">
               <el-input v-model="inbound.heartbeat" placeholder="10s" />
             </el-form-item>
-            <el-form-item label="0-RTT 握手">
+            <el-form-item :label="$t('inbound.zeroRtt')">
               <el-switch v-model="inbound.zero_rtt_handshake" />
             </el-form-item>
           </template>
 
           <!-- Naive -->
           <template v-if="inbound.type === 'naive'">
-            <el-form-item label="QUIC 拥塞控制">
-              <el-select v-model="inbound.quic_congestion_control" clearable placeholder="默认 cubic">
+            <el-form-item :label="$t('inbound.quicCongestion')">
+              <el-select v-model="inbound.quic_congestion_control" clearable :placeholder="$t('inbound.defaultCubic')">
                 <el-option label="cubic" value="cubic" />
                 <el-option label="bbr" value="bbr" />
                 <el-option label="bbr2" value="bbr2" />
@@ -259,13 +259,13 @@
 
           <!-- Direct(端口转发到固定上游) -->
           <template v-if="inbound.type === 'direct'">
-            <el-form-item label="覆盖目标地址">
-              <el-input v-model="inbound.override_address" placeholder="可选,所有连接转到此地址" />
+            <el-form-item :label="$t('inbound.overrideAddr')">
+              <el-input v-model="inbound.override_address" :placeholder="$t('inbound.overrideAddrPlaceholder')" />
             </el-form-item>
-            <el-form-item label="覆盖目标端口">
+            <el-form-item :label="$t('inbound.overridePort')">
               <el-input-number v-model="inbound.override_port" :min="0" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="网络">
+            <el-form-item :label="$t('network')">
               <el-select v-model="inbound.network" clearable placeholder="tcp + udp">
                 <el-option label="tcp" value="tcp" />
                 <el-option label="udp" value="udp" />
@@ -275,7 +275,7 @@
 
           <!-- TUN(网卡级代理) -->
           <template v-if="inbound.type === 'tun'">
-            <el-form-item label="接口地址">
+            <el-form-item :label="$t('inbound.interfaceAddr')">
               <el-select
                 v-model="inbound.address"
                 multiple
@@ -283,39 +283,39 @@
                 allow-create
                 default-first-option
                 :reserve-keyword="false"
-                placeholder="如 172.19.0.1/30 fdfe:dcba:9876::1/126(回车确认每条)"
+                :placeholder="$t('inbound.interfaceAddrPlaceholder')"
                 class="mono"
               />
               <div style="font-size:12px;color:var(--el-text-color-secondary);margin-top:4px;">
-                必填:tun 网卡的 IPv4 / IPv6 CIDR;sing-box 启动会校验,缺这个直接拒绝
+                {{ $t('inbound.interfaceAddrHint') }}
               </div>
             </el-form-item>
-            <el-form-item label="网卡名称">
-              <el-input v-model="inbound.interface_name" placeholder="自动 = 留空" class="mono" />
+            <el-form-item :label="$t('inbound.interfaceName')">
+              <el-input v-model="inbound.interface_name" :placeholder="$t('inbound.autoEmpty')" class="mono" />
             </el-form-item>
             <el-form-item label="MTU">
               <el-input-number v-model="inbound.mtu" :min="576" :max="65535" controls-position="right" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="协议栈">
+            <el-form-item :label="$t('inbound.stack')">
               <el-select v-model="inbound.stack">
                 <el-option label="system" value="system" />
                 <el-option label="gvisor" value="gvisor" />
                 <el-option label="mixed" value="mixed" />
               </el-select>
             </el-form-item>
-            <el-form-item label="自动路由">
+            <el-form-item :label="$t('inbound.autoRoute')">
               <el-switch v-model="inbound.auto_route" />
             </el-form-item>
-            <el-form-item v-if="inbound.auto_route" label="严格路由">
+            <el-form-item v-if="inbound.auto_route" :label="$t('inbound.strictRoute')">
               <el-switch v-model="inbound.strict_route" />
             </el-form-item>
-            <el-form-item label="UDP 超时">
+            <el-form-item :label="$t('rule.udpTimeout')">
               <el-input v-model="inbound.udp_timeout" placeholder="5m" />
             </el-form-item>
           </template>
 
           <!-- TProxy -->
-          <el-form-item v-if="inbound.type === 'tproxy'" label="网络">
+          <el-form-item v-if="inbound.type === 'tproxy'" :label="$t('network')">
             <el-select v-model="inbound.network" clearable placeholder="tcp + udp">
               <el-option label="tcp" value="tcp" />
               <el-option label="udp" value="udp" />
@@ -336,24 +336,24 @@
         class="auth-redirect-alert"
       >
         <template #title>
-          <b>{{ inbound.type }}</b> 是多账号协议 — 凭证(username / password)在「客户端」管理。
-          保存入站后到列表行点「客户端」按钮添加即可,创建时会按 mixed/socks/http 自动生成账号密码。
+          <b>{{ inbound.type }}</b>{{ $t('inbound.authAlert1') }}
+          {{ $t('inbound.authAlert2') }}
         </template>
       </el-alert>
 
       <!-- Transport(VLESS / VMess / Trojan) -->
       <div v-if="supportsTransport" class="form-section">
         <div class="form-section__head">
-          <h4 class="form-section__title">传输层(Transport)</h4>
+          <h4 class="form-section__title">{{ $t('inbound.transportLayer') }}</h4>
           <el-select v-model="transportType" size="small" style="width: 140px">
-            <el-option label="(裸 TCP)" value="" />
+            <el-option :label="$t('inbound.bareTcp')" value="" />
             <el-option v-for="(v, k) in TrspTypes" :key="k" :label="k" :value="v" />
           </el-select>
         </div>
 
         <!-- 协议推荐套餐 — 一键应用 transport + TLS 组合 -->
         <div class="presets">
-          <span class="presets__label">推荐:</span>
+          <span class="presets__label">{{ $t('inbound.recommended') }}</span>
           <button
             v-for="p in transportPresets"
             :key="p.key"
@@ -371,7 +371,7 @@
             <el-form-item label="Path">
               <el-input v-model="inbound.transport.path" placeholder="/" class="mono" />
             </el-form-item>
-            <el-form-item label="Host(WS Header,客户端验证用)">
+            <el-form-item :label="$t('inbound.wsHost')">
               <el-input :model-value="(inbound.transport.headers || {}).Host" @input="(v: string) => inbound.transport.headers = v ? { Host: v } : undefined" />
             </el-form-item>
           </template>
@@ -384,7 +384,7 @@
             <el-form-item label="Path">
               <el-input v-model="inbound.transport.path" placeholder="/" class="mono" />
             </el-form-item>
-            <el-form-item label="Host(逗号分隔)">
+            <el-form-item :label="$t('inbound.httpHost')">
               <el-input :model-value="(inbound.transport.host || []).join(',')" @input="(v: string) => inbound.transport.host = v ? v.split(',').map((x: string) => x.trim()) : []" />
             </el-form-item>
           </template>
@@ -402,12 +402,12 @@
       <!-- 高级:完整 JSON -->
       <details class="advanced">
         <summary>
-          <span>高级:完整 JSON</span>
-          <span class="hint-muted">— 上面字段覆盖不到的字段(fallback / multiplex / advanced TLS)直接改这里</span>
+          <span>{{ $t('inbound.advancedJson') }}</span>
+          <span class="hint-muted">{{ $t('inbound.advancedJsonHint') }}</span>
         </summary>
         <div class="advanced__body">
           <div class="advanced__head">
-            <el-tooltip content="从上面字段重新生成" placement="top">
+            <el-tooltip :content="$t('inbound.regenFromFields')" placement="top">
               <el-button text @click="syncFromJson"><el-icon><RefreshRight /></el-icon></el-button>
             </el-tooltip>
           </div>
@@ -448,6 +448,7 @@ import { TrspTypes } from '@/types/transport'
 import RandomUtil from '@/plugins/randomUtil'
 import Data from '@/store/modules/data'
 import { Loading, RefreshRight, Refresh, MagicStick, Plus, Delete } from '@element-plus/icons-vue'
+import { i18n } from '@/locales'
 
 const CloudflareTls = defineAsyncComponent(() => import('@/layouts/modals/CloudflareTls.vue'))
 
@@ -521,9 +522,9 @@ const bindableOutTags = computed((): string[] => [
 // endpoint 类型对应的机场场景说明 — 在下拉 label 后追加
 const endpointPurpose = (type: string): string => {
   switch (type) {
-    case 'warp':      return 'Cloudflare Warp · 解锁 ChatGPT / Netflix 等被拉黑 IP'
-    case 'wireguard': return '自建 WireGuard 落地'
-    case 'tailscale': return 'Tailscale 组网'
+    case 'warp':      return i18n.global.t('inbound.endpoint.warp')
+    case 'wireguard': return i18n.global.t('inbound.endpoint.wireguard')
+    case 'tailscale': return i18n.global.t('inbound.endpoint.tailscale')
     default:          return ''
   }
 }
@@ -628,7 +629,7 @@ const SINGLE_USER_TYPES = [
   { value: 'tproxy',   label: 'TProxy' },
 ]
 const isMultiUser = (t: string) => MULTI_USER_TYPES.some((x) => x.value === t)
-const typeCap = (t: string) => isMultiUser(t) ? '多用户' : '单用户'
+const typeCap = (t: string) => isMultiUser(t) ? i18n.global.t('inbound.multiUser') : i18n.global.t('inbound.singleUser')
 const HasTls = [InTypes.HTTP, InTypes.VMess, InTypes.Trojan, InTypes.Naive, InTypes.Hysteria, InTypes.TUIC, InTypes.Hysteria2, InTypes.VLESS, InTypes.AnyTls]
 const OnlyTLS = [InTypes.Hysteria, InTypes.Hysteria2, InTypes.TUIC, InTypes.Naive, InTypes.AnyTls]
 const HasInData = [InTypes.SOCKS, InTypes.HTTP, InTypes.Mixed, InTypes.Shadowsocks, InTypes.VMess, InTypes.ShadowTLS, InTypes.Trojan, InTypes.Hysteria, InTypes.VLESS, InTypes.AnyTls, InTypes.TUIC, InTypes.Hysteria2, InTypes.Naive]
@@ -660,21 +661,21 @@ const transportPresets = computed<Preset[]>(() => {
   const t = inbound.value.type
   if (t === 'vless') {
     return [
-      { key: 'tcp-reality', title: 'TCP + Reality', desc: '抗探测最优 · 直连服务器 · 无需证书', transport: {}, needsTls: true },
-      { key: 'ws-tls', title: 'WS + TLS', desc: '可走 Cloudflare CDN · 隐藏服务器真实 IP', transport: { type: 'ws', path: '/ws' }, needsTls: true },
-      { key: 'grpc-tls', title: 'gRPC + TLS', desc: 'h2 长连接 · 抗丢包 · 支持 CDN', transport: { type: 'grpc', service_name: 'grpc' }, needsTls: true },
+      { key: 'tcp-reality', title: 'TCP + Reality', desc: i18n.global.t('inbound.preset.tcpRealityDesc'), transport: {}, needsTls: true },
+      { key: 'ws-tls', title: 'WS + TLS', desc: i18n.global.t('inbound.preset.wsTlsVlessDesc'), transport: { type: 'ws', path: '/ws' }, needsTls: true },
+      { key: 'grpc-tls', title: 'gRPC + TLS', desc: i18n.global.t('inbound.preset.grpcTlsDesc'), transport: { type: 'grpc', service_name: 'grpc' }, needsTls: true },
     ]
   }
   if (t === 'vmess') {
     return [
-      { key: 'ws-tls', title: 'WS + TLS', desc: '主流方案 · 兼容 CDN', transport: { type: 'ws', path: '/ws' }, needsTls: true },
-      { key: 'tcp-tls', title: '裸 TCP + TLS', desc: '握手开销最小 · 直连场景', transport: {}, needsTls: true },
+      { key: 'ws-tls', title: 'WS + TLS', desc: i18n.global.t('inbound.preset.wsTlsVmessDesc'), transport: { type: 'ws', path: '/ws' }, needsTls: true },
+      { key: 'tcp-tls', title: i18n.global.t('inbound.preset.bareTcpTlsTitle'), desc: i18n.global.t('inbound.preset.tcpTlsVmessDesc'), transport: {}, needsTls: true },
     ]
   }
   if (t === 'trojan') {
     return [
-      { key: 'tcp-tls', title: '裸 TCP + TLS', desc: '协议原生方案 · 性能最佳', transport: {}, needsTls: true },
-      { key: 'ws-tls', title: 'WS + TLS', desc: '套 CDN · 隐藏 IP', transport: { type: 'ws', path: '/ws' }, needsTls: true },
+      { key: 'tcp-tls', title: i18n.global.t('inbound.preset.bareTcpTlsTitle'), desc: i18n.global.t('inbound.preset.tcpTlsTrojanDesc'), transport: {}, needsTls: true },
+      { key: 'ws-tls', title: 'WS + TLS', desc: i18n.global.t('inbound.preset.wsTlsTrojanDesc'), transport: { type: 'ws', path: '/ws' }, needsTls: true },
     ]
   }
   return []
