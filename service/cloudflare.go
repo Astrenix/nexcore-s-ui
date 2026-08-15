@@ -386,6 +386,6 @@ func (s *CloudflareService) IssueTLS(name, fqdn, email, cfToken, dataDir string)
 	if err := tx.Commit().Error; err != nil {
 		return 0, err
 	}
-	LastUpdate = dt
+	LastUpdate.Store(dt)
 	return tls.Id, nil
 }

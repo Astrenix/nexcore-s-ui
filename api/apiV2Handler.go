@@ -1,9 +1,9 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	apiv1 "github.com/alireza0/s-ui/api/v1"
@@ -24,6 +24,7 @@ type TokenInMemory struct {
 
 type APIv2Handler struct {
 	ApiService
+	tokensMu sync.RWMutex
 	tokens   *[]TokenInMemory
 	logSvc   service.ApiLogService
 }
@@ -216,19 +217,26 @@ func (a *APIv2Handler) findUsername(c *gin.Context) string {
 
 // identifyToken 把 raw token 解析成 (username, desc),命中失败返回 ("","")。
 // 不阻塞 — 只读内存副本,DB 调整由 ReloadTokens 异步刷。
+//
+// 比对走 service.MatchToken(sha256/legacy 双模式 + constant-time),跟 api/v1
+// 中间件同一套语义。历史上这里是裸 `t.Token == token`,而内存表来自把 token
+// 掩码成 "****" 的 LoadTokens —— 合法 token 全部失配,且发 "****" 即可命中,
+// 是完整的认证绕过。现在数据源改为 LoadTokensForAuth(真实值)。
 func (a *APIv2Handler) identifyToken(token string) (string, string) {
-	if token == "" || a.tokens == nil {
+	if token == "" {
+		return "", ""
+	}
+	a.tokensMu.RLock()
+	defer a.tokensMu.RUnlock()
+	if a.tokens == nil {
 		return "", ""
 	}
 	now := time.Now().Unix()
-	for index := 0; index < len(*a.tokens); index++ {
-		t := (*a.tokens)[index]
+	for _, t := range *a.tokens {
 		if t.Expiry > 0 && t.Expiry < now {
-			(*a.tokens) = append((*a.tokens)[:index], (*a.tokens)[index+1:]...)
-			index--
 			continue
 		}
-		if t.Token == token {
+		if service.MatchToken(t.Token, token) {
 			return t.Username, t.Desc
 		}
 	}
@@ -236,27 +244,25 @@ func (a *APIv2Handler) identifyToken(token string) (string, string) {
 }
 
 func (a *APIv2Handler) ReloadTokens() {
-	tokens, err := a.ApiService.LoadTokens()
-	if err == nil {
-		var newTokens []TokenInMemory
-		err = json.Unmarshal(bytesOrEmpty(tokens), &newTokens)
-		if err != nil {
-			logger.Error("unable to load tokens: ", err)
-		}
-		a.tokens = &newTokens
-	} else {
+	tokens, err := a.ApiService.LoadTokensForAuth()
+	if err != nil {
 		logger.Error("unable to load tokens: ", err)
+		return
 	}
-}
-
-// LoadTokens 在 db 空 Tokens 表时返回 nil(不是 []),json.Unmarshal(nil) 报错;
-// 兜个底返回 "[]"。
-func bytesOrEmpty(b []byte) []byte {
-	if len(b) == 0 {
-		return []byte("[]")
+	newTokens := make([]TokenInMemory, 0, len(tokens))
+	for _, t := range tokens {
+		username := ""
+		if t.User != nil {
+			username = t.User.Username
+		}
+		newTokens = append(newTokens, TokenInMemory{
+			Token:    t.Token,
+			Expiry:   t.Expiry,
+			Username: username,
+			Desc:     t.Desc,
+		})
 	}
-	if !bytes.HasPrefix(b, []byte("[")) {
-		return []byte("[]")
-	}
-	return b
+	a.tokensMu.Lock()
+	a.tokens = &newTokens
+	a.tokensMu.Unlock()
 }

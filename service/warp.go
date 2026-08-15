@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/util/common"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -30,7 +29,7 @@ func (s *WarpService) getWarpInfo(deviceId string, accessToken string) ([]byte, 
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
 		return nil, err
@@ -89,12 +88,23 @@ func (s *WarpService) RegisterWarp(ep *model.Endpoint) error {
 		return err
 	}
 
-	deviceId := rspData["id"].(string)
-	token := rspData["token"].(string)
-	license, ok := rspData["account"].(map[string]interface{})["license"].(string)
+	// CF 返回体不受我们控制(限流页 / 错误 JSON / schema 变更都可能),
+	// 全部 comma-ok 取值:裸断言会让注册流程 panic 在写事务里。
+	deviceId, ok := rspData["id"].(string)
 	if !ok {
-		logger.Debug("Error accessing license value.")
-		return err
+		return common.NewError("warp register: unexpected response, missing device id")
+	}
+	token, ok := rspData["token"].(string)
+	if !ok {
+		return common.NewError("warp register: unexpected response, missing token")
+	}
+	account, ok := rspData["account"].(map[string]interface{})
+	if !ok {
+		return common.NewError("warp register: unexpected response, missing account")
+	}
+	license, ok := account["license"].(string)
+	if !ok {
+		return common.NewError("warp register: unexpected response, missing license")
 	}
 
 	warpInfo, err := s.getWarpInfo(deviceId, token)
@@ -115,8 +125,13 @@ func (s *WarpService) RegisterWarp(ep *model.Endpoint) error {
 	addresses, _ := interfaceConfig["addresses"].(map[string]interface{})
 	v4, _ := addresses["v4"].(string)
 	v6, _ := addresses["v6"].(string)
-	peer, _ := warpConfig["peers"].([]interface{})[0].(map[string]interface{})
-	peerEndpoint, _ := peer["endpoint"].(map[string]interface{})["host"].(string)
+	rspPeers, _ := warpConfig["peers"].([]interface{})
+	if len(rspPeers) == 0 {
+		return common.NewError("warp register: unexpected response, empty peers")
+	}
+	peer, _ := rspPeers[0].(map[string]interface{})
+	peerEndpointObj, _ := peer["endpoint"].(map[string]interface{})
+	peerEndpoint, _ := peerEndpointObj["host"].(string)
 	peerEpAddress, peerEpPort, err := net.SplitHostPort(peerEndpoint)
 	if err != nil {
 		return err
@@ -204,7 +219,7 @@ func (s *WarpService) SetWarpLicense(old_license string, ep *model.Endpoint) err
 	}
 	req.Header.Set("Authorization", "Bearer "+warpData["access_token"])
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -222,10 +237,14 @@ func (s *WarpService) SetWarpLicense(old_license string, ep *model.Endpoint) err
 		return err
 	}
 
-	if success, ok := response["success"].(bool); ok && success == false {
+	if success, ok := response["success"].(bool); ok && !success {
 		errorArr, _ := response["errors"].([]interface{})
-		errorObj := errorArr[0].(map[string]interface{})
-		return common.NewError(errorObj["code"], errorObj["message"])
+		if len(errorArr) > 0 {
+			if errorObj, ok := errorArr[0].(map[string]interface{}); ok {
+				return common.NewError(errorObj["code"], errorObj["message"])
+			}
+		}
+		return common.NewError("warp license: request failed without error detail")
 	}
 
 	return nil

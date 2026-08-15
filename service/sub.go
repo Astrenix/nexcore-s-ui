@@ -240,59 +240,62 @@ func (s *SubService) applyOutcomes(subId uint, outcomes []ProbeOutcome) error {
 		return errors.New("no outcomes to apply")
 	}
 	now := time.Now()
-	return database.GetDB().Transaction(func(tx *gorm.DB) error {
-		seenKeys := make(map[string]bool, len(outcomes))
-		for _, o := range outcomes {
-			key := fmt.Sprintf("%s:%d", o.Node.Server, o.Node.ServerPort)
-			seenKeys[key] = true
-
-			// 找现有行
-			var existing model.SubNode
-			err := tx.Where("sub_id = ? AND server = ? AND server_port = ?",
-				subId, o.Node.Server, o.Node.ServerPort).First(&existing).Error
-			if err != nil && err != gorm.ErrRecordNotFound {
-				return err
-			}
-
-			row := model.SubNode{
-				SubId:       subId,
-				Remark:      o.Node.Remark,
-				Type:        o.Node.Type,
-				Server:      o.Node.Server,
-				ServerPort:  o.Node.ServerPort,
-				Options:     o.Node.Options,
-				Country:     o.Country,
-				ExitIP:      o.ExitIP,
-				LatencyMs:   o.LatencyMs,
-				Alive:       o.Alive,
-				LastError:   o.Error,
-				LastCheckAt: now,
-			}
-			if err == gorm.ErrRecordNotFound {
-				if err := tx.Create(&row).Error; err != nil {
-					return err
-				}
-			} else {
-				row.Id = existing.Id
-				if err := tx.Save(&row).Error; err != nil {
-					return err
-				}
-			}
+	// 组装本轮全部行 + 收集(server,port)白名单,避免原先"每节点先 First 再 Save"
+	// 的 N+1 与"全表 Find 后逐条 Delete"的第二次 N+1 —— 大订阅刷新时这是一个
+	// 长写事务持锁的主因,会跟 StatsJob/DepleteJob 抢 SQLite 写锁触发 busy。
+	rows := make([]model.SubNode, 0, len(outcomes))
+	servers := make([]string, 0, len(outcomes))
+	ports := make([]uint16, 0, len(outcomes))
+	seen := make(map[string]bool, len(outcomes))
+	for _, o := range outcomes {
+		key := fmt.Sprintf("%s:%d", o.Node.Server, o.Node.ServerPort)
+		if seen[key] {
+			continue // 同订阅内重复 server:port,去重避免 upsert 冲突
 		}
-		// 删除未出现的
-		var oldRows []model.SubNode
-		if err := tx.Where("sub_id = ?", subId).Find(&oldRows).Error; err != nil {
+		seen[key] = true
+		rows = append(rows, model.SubNode{
+			SubId:       subId,
+			Remark:      o.Node.Remark,
+			Type:        o.Node.Type,
+			Server:      o.Node.Server,
+			ServerPort:  o.Node.ServerPort,
+			Options:     o.Node.Options,
+			Country:     o.Country,
+			ExitIP:      o.ExitIP,
+			LatencyMs:   o.LatencyMs,
+			Alive:       o.Alive,
+			LastError:   o.Error,
+			LastCheckAt: now,
+		})
+		servers = append(servers, o.Node.Server)
+		ports = append(ports, o.Node.ServerPort)
+	}
+
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		// 批量 upsert:命中 idx_sub_host(sub_id,server,server_port)唯一索引就更新探测结果,
+		// 保留 id / 自增字段不动。分批以避开 SQLite 999 变量上限。
+		const batch = 100
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "sub_id"}, {Name: "server"}, {Name: "server_port"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"remark", "type", "options", "country", "exit_ip",
+				"latency_ms", "alive", "last_error", "last_check_at",
+			}),
+		}).CreateInBatches(rows, batch).Error; err != nil {
 			return err
 		}
-		for _, r := range oldRows {
-			k := fmt.Sprintf("%s:%d", r.Server, r.ServerPort)
-			if !seenKeys[k] {
-				if err := tx.Delete(&model.SubNode{}, r.Id).Error; err != nil {
-					return err
-				}
-			}
+
+		// 删除本轮未出现的旧节点:一条 NOT IN 批量删,替代原来的全表扫 + 逐条 Delete。
+		// SQLite 无原生元组 IN,用 server||':'||port 拼 key 比对本轮白名单。
+		keys := make([]string, 0, len(rows))
+		for i := range servers {
+			keys = append(keys, fmt.Sprintf("%s:%d", servers[i], ports[i]))
 		}
-		return nil
+		del := tx.Where("sub_id = ?", subId)
+		if len(keys) > 0 {
+			del = del.Where("server || ':' || server_port NOT IN ?", keys)
+		}
+		return del.Delete(&model.SubNode{}).Error
 	})
 }
 

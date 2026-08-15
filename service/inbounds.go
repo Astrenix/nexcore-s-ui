@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/alireza0/s-ui/database"
@@ -126,8 +127,8 @@ func (s *InboundService) GetAll() (*[]map[string]interface{}, error) {
 			inbData["total_up"] = int64(0)
 			inbData["total_down"] = int64(0)
 		}
-		if onlineResources != nil && onlineResources.InboundIPs != nil {
-			inbData["online_ips"] = onlineResources.InboundIPs[inbound.Tag]
+		if snap := onlineResources.Load(); snap != nil && snap.InboundIPs != nil {
+			inbData["online_ips"] = snap.InboundIPs[inbound.Tag]
 		} else {
 			inbData["online_ips"] = 0
 		}
@@ -471,8 +472,22 @@ func (s *InboundService) addUsers(db *gorm.DB, inboundJson []byte, inboundId uin
 
 
 func (s *InboundService) initUsers(db *gorm.DB, inboundJson []byte, clientIds string, inboundType string) ([]byte, error) {
-	ClientIds := strings.Split(clientIds, ",")
-	if len(ClientIds) == 0 {
+	// clientIds 来自请求表单(initUsers 字段),历史实现直接 Join 进 SQL 的 IN(...)
+	// 里 → SQL 注入。这里逐个解析为整数:非数字一律拒绝,注入载荷无法成形。
+	rawIds := strings.Split(clientIds, ",")
+	validIds := make([]string, 0, len(rawIds))
+	for _, raw := range rawIds {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return nil, common.NewError("invalid client id: ", raw)
+		}
+		validIds = append(validIds, strconv.FormatUint(id, 10))
+	}
+	if len(validIds) == 0 {
 		return inboundJson, nil
 	}
 
@@ -486,7 +501,7 @@ func (s *InboundService) initUsers(db *gorm.DB, inboundJson []byte, clientIds st
 		return nil, err
 	}
 
-	condition := fmt.Sprintf("id IN (%s)", strings.Join(ClientIds, ","))
+	condition := fmt.Sprintf("id IN (%s)", strings.Join(validIds, ","))
 	inbound["users"], err = s.fetchUsers(db, inboundType, condition, inbound)
 	if err != nil {
 		return nil, err

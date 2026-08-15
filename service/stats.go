@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/alireza0/s-ui/database"
@@ -18,20 +19,24 @@ type onlines struct {
 	UserIPs    map[string]int `json:"user_ips,omitempty"`    // 客户端 name → 当前活跃 source IP 数
 }
 
-var onlineResources = &onlines{}
+// onlineResources 由 SaveStats(cron 每 10s)整体重建、被 GetOnlines / 入站列表 API
+// 并发读。过去是就地改字段的共享指针 → 读方可能读到半更新的 map / 撕裂 slice
+// (-race 必报)。改 atomic.Pointer:写方构造**全新**快照一次性 Store,读方 Load
+// 拿到的永远是一致快照,无锁、无撕裂。
+var onlineResources atomic.Pointer[onlines]
+
+func init() {
+	onlineResources.Store(&onlines{})
+}
 
 type StatsService struct {
 }
 
 func (s *StatsService) SaveStats(enableTraffic bool) error {
-	// 先 reset onlines —— 不论核心是否运行,旧"在线"快照都不该再展示。
-	// 旧版只在能拿到 stats 时才 reset,sing-box 没运行时直接 return,
-	// 前端会一直显示停止前的在线列表(明显错误)。
-	onlineResources.Inbound = nil
-	onlineResources.Outbound = nil
-	onlineResources.User = nil
-	onlineResources.InboundIPs = nil
-	onlineResources.UserIPs = nil
+	// 每轮构造全新快照 snap;函数所有返回路径统一在 defer 里一次性发布。
+	// 空快照即代表"无在线"——不论核心是否运行,旧快照都不该继续展示。
+	snap := &onlines{}
+	defer func() { onlineResources.Store(snap) }()
 
 	if corePtr == nil || !corePtr.IsRunning() {
 		return nil
@@ -50,10 +55,10 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 	// 提前 return)也想拿到 IP 计数,所以放在 stats 检查之前。
 	inbIPs, usrIPs := st.SnapshotOnlineIPs(60)
 	if len(inbIPs) > 0 {
-		onlineResources.InboundIPs = inbIPs
+		snap.InboundIPs = inbIPs
 	}
 	if len(usrIPs) > 0 {
-		onlineResources.UserIPs = usrIPs
+		snap.UserIPs = usrIPs
 	}
 
 	if len(*stats) == 0 {
@@ -87,11 +92,11 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 		if stat.Direction {
 			switch stat.Resource {
 			case "inbound":
-				onlineResources.Inbound = append(onlineResources.Inbound, stat.Tag)
+				snap.Inbound = append(snap.Inbound, stat.Tag)
 			case "outbound":
-				onlineResources.Outbound = append(onlineResources.Outbound, stat.Tag)
+				snap.Outbound = append(snap.Outbound, stat.Tag)
 			case "user":
-				onlineResources.User = append(onlineResources.User, stat.Tag)
+				snap.User = append(snap.User, stat.Tag)
 			}
 		}
 	}
@@ -204,7 +209,10 @@ func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model
 }
 
 func (s *StatsService) GetOnlines() (onlines, error) {
-	return *onlineResources, nil
+	if snap := onlineResources.Load(); snap != nil {
+		return *snap, nil
+	}
+	return onlines{}, nil
 }
 
 // GetLiveTotals 返当前 sing-box StatsTracker 内存里的累计字节(cum + pending),

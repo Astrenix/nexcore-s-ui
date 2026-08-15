@@ -107,20 +107,34 @@ func addTls(out *map[string]interface{}, tls *model.Tls) {
 	if cipherSuites, ok := tlsServer["cipher_suites"]; ok {
 		tlsConfig["cipher_suites"] = cipherSuites
 	}
-	if reality, ok := tlsServer["reality"].(map[string]interface{}); ok && reality["enabled"].(bool) {
-		realityConfig := tlsConfig["reality"].(map[string]interface{})
-		realityConfig["enabled"] = true
-		if shortIDs, ok := reality["short_id"].([]interface{}); ok && len(shortIDs) > 0 {
-			realityConfig["short_id"] = shortIDs[common.RandomInt(len(shortIDs))]
+	// 下面两段全部走 comma-ok:`reality["enabled"].(bool)` 与
+	// `tlsConfig["reality"].(map[...])` 在键缺失 / 类型不符时会 panic,而这些 map
+	// 直接来自 DB 里的入站 JSON(可能由旧版本、手工导入或未来 schema 变更写入),
+	// 一次 panic 就是整个请求 500。
+	if reality, ok := tlsServer["reality"].(map[string]interface{}); ok {
+		if enabled, ok := reality["enabled"].(bool); ok && enabled {
+			realityConfig, ok := tlsConfig["reality"].(map[string]interface{})
+			if !ok {
+				realityConfig = map[string]interface{}{}
+			}
+			realityConfig["enabled"] = true
+			if shortIDs, ok := reality["short_id"].([]interface{}); ok && len(shortIDs) > 0 {
+				realityConfig["short_id"] = shortIDs[common.RandomInt(len(shortIDs))]
+			}
+			tlsConfig["reality"] = realityConfig
 		}
-		tlsConfig["reality"] = realityConfig
 	}
-	if ech, ok := tlsServer["ech"].(map[string]interface{}); ok && ech["enabled"].(bool) {
-		echConfig := tlsConfig["ech"].(map[string]interface{})
-		echConfig["enabled"] = true
-		echConfig["pq_signature_schemes_enabled"] = ech["pq_signature_schemes_enabled"]
-		echConfig["dynamic_record_sizing_disabled"] = ech["dynamic_record_sizing_disabled"]
-		tlsConfig["ech"] = echConfig
+	if ech, ok := tlsServer["ech"].(map[string]interface{}); ok {
+		if enabled, ok := ech["enabled"].(bool); ok && enabled {
+			echConfig, ok := tlsConfig["ech"].(map[string]interface{})
+			if !ok {
+				echConfig = map[string]interface{}{}
+			}
+			echConfig["enabled"] = true
+			echConfig["pq_signature_schemes_enabled"] = ech["pq_signature_schemes_enabled"]
+			echConfig["dynamic_record_sizing_disabled"] = ech["dynamic_record_sizing_disabled"]
+			tlsConfig["ech"] = echConfig
+		}
 	}
 
 	(*out)["tls"] = tlsConfig

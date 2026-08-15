@@ -18,7 +18,9 @@ import (
 // race detector 跑就报 data race。改成 atomic 一族,CompareAndSwap 替代手写互斥,
 // 语义不变但消除并发竞争(panel API 多并发触发 RestartCore 时直接体现)。
 var (
-	LastUpdate          int64
+	// LastUpdate 被 Save / CheckChanges / DepleteClients / ResetClients / cloudflare
+	// 多 goroutine(API + cron)并发读写,改 atomic 消除 data race。
+	LastUpdate          atomic.Int64
 	corePtr             *core.Core
 	startCoreInProgress atomic.Bool  // 串行化 Start / restartCoreWithConfig
 	lastStartFailNano   atomic.Int64 // time.UnixNano(),0 = 从未失败过
@@ -283,7 +285,7 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		return nil, err
 	}
 
-	LastUpdate = time.Now().Unix()
+	LastUpdate.Store(time.Now().Unix())
 
 	return objs, nil
 }
@@ -301,32 +303,38 @@ func (s *ConfigService) CheckChanges(lu string) (bool, error) {
 	if lu == "" {
 		return true, nil
 	}
-	if LastUpdate == 0 {
+	if LastUpdate.Load() == 0 {
+		// lu 是 query 参数,先校验成整数再参数化传入,避免拼接注入
+		luInt, convErr := strconv.ParseInt(lu, 10, 64)
+		if convErr != nil {
+			return false, convErr
+		}
 		db := database.GetDB()
 		var count int64
-		err := db.Model(model.Changes{}).Where("date_time > " + lu).Count(&count).Error
+		err := db.Model(model.Changes{}).Where("date_time > ?", luInt).Count(&count).Error
 		if err == nil {
-			LastUpdate = time.Now().Unix()
+			LastUpdate.Store(time.Now().Unix())
 		}
 		return count > 0, err
 	} else {
 		intLu, err := strconv.ParseInt(lu, 10, 64)
-		return LastUpdate > intLu, err
+		return LastUpdate.Load() > intLu, err
 	}
 }
 
 func (s *ConfigService) GetChanges(actor string, chngKey string, count string) []model.Changes {
 	c, _ := strconv.Atoi(count)
-	whereString := "`id`>0"
-	if len(actor) > 0 {
-		whereString += " and `actor`='" + actor + "'"
-	}
-	if len(chngKey) > 0 {
-		whereString += " and `key`='" + chngKey + "'"
-	}
 	db := database.GetDB()
 	var chngs []model.Changes
-	err := db.Model(model.Changes{}).Where(whereString).Order("`id` desc").Limit(c).Scan(&chngs).Error
+	// 参数化:actor / chngKey 来自 query string,拼进 WHERE 会构成 SQL 注入
+	query := db.Model(model.Changes{}).Where("`id` > ?", 0)
+	if len(actor) > 0 {
+		query = query.Where("`actor` = ?", actor)
+	}
+	if len(chngKey) > 0 {
+		query = query.Where("`key` = ?", chngKey)
+	}
+	err := query.Order("`id` desc").Limit(c).Scan(&chngs).Error
 	if err != nil {
 		logger.Warning(err)
 	}

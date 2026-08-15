@@ -1,19 +1,23 @@
 package service
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/alireza0/s-ui/logger"
 )
 
 const (
 	subFetchTimeout = 30 * time.Second
 	subUserAgent    = "v2rayN/6.42" // 多数机场看 UA:clash → YAML,v2rayN/sing-box → base64 URI list(我们要后者)
-	subMaxBodyBytes = 2 << 20              // 2 MB 上限,防止误下整张大文件
+	subMaxBodyBytes = 2 << 20       // 2 MB 上限,防止误下整张大文件
+	subMaxNodes     = 1000          // 单订阅节点数上限:2MB body 可展开上万条 URI,
+	//                                 每条都要探测(最多两次 8s)+ 全程持 subOpsMu,
+	//                                 不设限单次刷新可跑数十分钟并锁死整个订阅子系统
 )
 
 // FetchSub 拉取订阅 URL,自动识别格式并解析为 ParsedNode 列表。
@@ -89,6 +93,11 @@ func parseURILines(text string) ([]ParsedNode, int, int, error) {
 			continue // 单条失败不让全废
 		}
 		nodes = append(nodes, *n)
+		if len(nodes) >= subMaxNodes {
+			// 超上限就截断并告警,不静默丢——避免"以为全导入了实际只导了一部分"
+			logger.Warningf("subscription truncated at %d nodes (limit reached)", subMaxNodes)
+			break
+		}
 	}
 	if len(nodes) == 0 {
 		return nil, 0, total, fmt.Errorf("0 valid links parsed from %d candidates", total)
@@ -101,12 +110,11 @@ func parseURILines(text string) ([]ParsedNode, int, int, error) {
 // 注意:这台开发机走 SOCKS/HTTP 代理出网,Go 默认 net/http 会读 HTTP_PROXY env
 // 自动走代理,这正是我们想要的(订阅服务器在国外,本机能直连就直连,被墙就代理)。
 func httpGetText(url string) (string, error) {
-	client := &http.Client{
-		Timeout: subFetchTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
-		},
+	// scheme 白名单 + 内网/回环/metadata 地址拦截(SSRF 防护),详见 ssrf_guard.go
+	if _, err := validateFetchURL(url); err != nil {
+		return "", err
 	}
+	client := newSSRFSafeClient(subFetchTimeout)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", err

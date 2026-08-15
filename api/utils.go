@@ -7,6 +7,7 @@ import (
 
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
+	"github.com/alireza0/s-ui/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,16 +18,10 @@ type Msg struct {
 	Obj     interface{} `json:"obj"`
 }
 
+// getRemoteIp 只在直连对端是可信反代(回环/私网)时才采信 X-Forwarded-For。
+// 详见 common.ClientIP —— 这是登录爆破节流的 key 来源,伪造 XFF 会让节流失效。
 func getRemoteIp(c *gin.Context) string {
-	value := c.GetHeader("X-Forwarded-For")
-	if value != "" {
-		ips := strings.Split(value, ",")
-		return ips[0]
-	} else {
-		addr := c.Request.RemoteAddr
-		ip, _, _ := net.SplitHostPort(addr)
-		return ip
-	}
+	return common.ClientIP(c.Request.RemoteAddr, c.GetHeader("X-Forwarded-For"))
 }
 
 func getHostname(c *gin.Context) string {

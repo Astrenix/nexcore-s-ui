@@ -2,7 +2,6 @@ package v1
 
 import (
 	"crypto/subtle"
-	"net"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
 	"github.com/alireza0/s-ui/service"
+	"github.com/alireza0/s-ui/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -192,15 +192,8 @@ func AccessLogMiddleware(logSvc *service.ApiLogService) gin.HandlerFunc {
 	}
 }
 
+// remoteIP 与 api.getRemoteIp 同语义:XFF 仅在直连对端为可信反代时采信,
+// 否则以 TCP 层真实对端为准(防伪造头污染审计日志)。
 func remoteIP(c *gin.Context) string {
-	if v := c.GetHeader("X-Forwarded-For"); v != "" {
-		ips := strings.Split(v, ",")
-		return strings.TrimSpace(ips[0])
-	}
-	addr := c.Request.RemoteAddr
-	ip, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return addr
-	}
-	return ip
+	return common.ClientIP(c.Request.RemoteAddr, c.GetHeader("X-Forwarded-For"))
 }

@@ -599,7 +599,7 @@ func (s *ClientService) DepleteClients() ([]uint, error) {
 		if err != nil {
 			return nil, err
 		}
-		LastUpdate = dt
+		LastUpdate.Store(dt)
 	}
 
 	return inboundIds, nil
@@ -685,7 +685,7 @@ func (s *ClientService) ResetClients(tx *gorm.DB, dt int64) ([]uint, error) {
 		if err != nil {
 			return nil, err
 		}
-		LastUpdate = dt
+		LastUpdate.Store(dt)
 	}
 	return inboundIds, nil
 }

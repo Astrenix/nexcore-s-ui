@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -235,6 +236,43 @@ func (s *UserService) LoadTokens() ([]byte, error) {
 	}
 	jsonResult, _ := json.MarshalIndent(result, "", "  ")
 	return jsonResult, nil
+}
+
+// LoadTokensForAuth 给 /apiv2 鉴权用 —— 返回 DB 里的**真实** token 列(hash 或
+// legacy 明文),不掩码。跟 LoadTokens 分家是因为后者的 "****" 掩码是给前端展示
+// 的,一旦被拿去做等值比较,任何人发 Token: **** 都能命中 → 认证绕过。
+// 结果只进内存鉴权表,绝不出网。
+func (s *UserService) LoadTokensForAuth() ([]model.Tokens, error) {
+	db := database.GetDB()
+	var tokens []model.Tokens
+	err := db.Model(model.Tokens{}).Preload("User").
+		Where("expiry == 0 or expiry > ?", time.Now().Unix()).Find(&tokens).Error
+	if err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
+
+// MaskedToken 是 token 对外展示时的占位符。定义在这里是为了让"掩码值永远不是
+// 有效凭证"成为一条可被引用、可被测试的不变式,而不是散落在各处的字面量。
+const MaskedToken = "****"
+
+// MatchToken 双模式 constant-time 比对,语义跟 api/v1 中间件的 resolveToken 一致:
+// DB 存的是 sha256 hex(新 token)就跟 sha256(raw) 比,否则按 legacy 明文比。
+func MatchToken(stored string, raw string) bool {
+	if stored == "" || raw == "" {
+		return false
+	}
+	// 掩码值任何一侧出现都直接拒绝:正常写入路径不会把 "****" 落库,但一旦
+	// 有人(或将来某个 bug)把展示值喂进鉴权表,它绝不能成为通行证。
+	if stored == MaskedToken || raw == MaskedToken {
+		return false
+	}
+	compare := raw
+	if looksLikeTokenHash(stored) {
+		compare = hashToken(raw)
+	}
+	return subtle.ConstantTimeCompare([]byte(stored), []byte(compare)) == 1
 }
 
 func (s *UserService) GetUserTokens(username string) (*[]model.Tokens, error) {

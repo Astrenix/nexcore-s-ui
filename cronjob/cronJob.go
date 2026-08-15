@@ -3,6 +3,8 @@ package cronjob
 import (
 	"time"
 
+	"github.com/alireza0/s-ui/logger"
+
 	"github.com/robfig/cron/v3"
 )
 
@@ -14,8 +16,29 @@ func NewCronJob() *CronJob {
 	return &CronJob{}
 }
 
+// cronLogger 把 robfig/cron 的日志接到项目 logger。只在作业被跳过 / 出错时有输出,
+// 正常调度不刷屏。
+type cronLogger struct{}
+
+func (cronLogger) Info(msg string, keysAndValues ...interface{}) {
+	// SkipIfStillRunning 跳过重入作业时走这里 —— 用 Warning 让"作业堆积"可见
+	logger.Warning(append([]interface{}{"cron: ", msg, " "}, keysAndValues...)...)
+}
+
+func (cronLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+	logger.Error(append([]interface{}{"cron: ", msg, " ", err.Error(), " "}, keysAndValues...)...)
+}
+
 func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
-	c.cron = cron.New(cron.WithLocation(loc), cron.WithSeconds())
+	// SkipIfStillRunning:上一轮同名作业还在跑就跳过本轮,不叠 goroutine。
+	// 关键防护——大订阅刷新(可能几分钟)期间,每分钟一次的 SubRefreshJob 不会
+	// 堆积成一片阻塞在同一把 subOpsMu 上的 goroutine。快作业(StatsJob 等)几乎
+	// 瞬时完成,不受影响。
+	c.cron = cron.New(
+		cron.WithLocation(loc),
+		cron.WithSeconds(),
+		cron.WithChain(cron.SkipIfStillRunning(cronLogger{})),
+	)
 	c.cron.Start()
 
 	go func() {
