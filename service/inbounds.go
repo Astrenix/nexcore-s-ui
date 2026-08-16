@@ -495,10 +495,6 @@ func (s *InboundService) initUsers(db *gorm.DB, inboundJson []byte, clientIds st
 		}
 		validIds = append(validIds, strconv.FormatUint(id, 10))
 	}
-	if len(validIds) == 0 {
-		return inboundJson, nil
-	}
-
 	if !s.hasUser(inboundType) {
 		return inboundJson, nil
 	}
@@ -507,6 +503,21 @@ func (s *InboundService) initUsers(db *gorm.DB, inboundJson []byte, clientIds st
 	err := json.Unmarshal(inboundJson, &inbound)
 	if err != nil {
 		return nil, err
+	}
+
+	// 没指定初始 client 的多账号协议必须显式塞哨兵账号 —— 不能像以前那样
+	// 原样返回。原样返回意味着下发给 sing-box 的入站【没有 users 字段】,而
+	// mixed/socks/http/naive 在无 users 时就是**无鉴权开放代理**。
+	//
+	// 这条路径以前很难走到(UI 建入站几乎总会勾初始客户端),但 /api/v1 与
+	// 节点交付(provision)会大量创建"先建入站、客户端稍后由主控 fan-out"的
+	// 入站,必然命中。
+	//
+	// 缺口只在"新建后到下次 core 重启之间"这段窗口:重启走 GetAllConfig →
+	// addUsers → fetchUsers,那条路径一直有哨兵兜底。但这个窗口可以是数周。
+	if len(validIds) == 0 {
+		inbound["users"] = []json.RawMessage{sentinelUserFor(inboundType)}
+		return json.Marshal(inbound)
 	}
 
 	condition := fmt.Sprintf("id IN (%s)", strings.Join(validIds, ","))

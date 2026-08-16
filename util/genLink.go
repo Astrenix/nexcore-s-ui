@@ -133,9 +133,28 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 	case "http":
 		return httpLink(userConfig["http"], Addrs)
 	case "mixed":
+		// mixed 入站的凭据存在 client.config["mixed"] —— InboundService.fetchUsers
+		// 下发给 sing-box 时读的就是这个键(json_extract(config, "$.mixed"))。
+		//
+		// 此前这里只读 config["socks"] / config["http"],于是"只填了 config.mixed"
+		// 的客户端(通过 /api/v1 创建的正常形态,以及主控 fan-out 建的每一个账号)
+		// 拿到的链接是 `socks5://:@host:port` —— 账号密码全空。节点端明明有这个
+		// 账号、鉴权也正常,用户导入客户端却怎么都连不上,且面板上看一切正常。
+		//
+		// socks/http 分键仍然优先:面板 UI 老数据可能给两个协议配了不同凭据,
+		// 不能被 mixed 覆盖掉。只有它们缺失时才回退到 mixed。
+		socksCfg, httpCfg := userConfig["socks"], userConfig["http"]
+		if mixedCfg := userConfig["mixed"]; len(mixedCfg) > 0 {
+			if len(socksCfg) == 0 {
+				socksCfg = mixedCfg
+			}
+			if len(httpCfg) == 0 {
+				httpCfg = mixedCfg
+			}
+		}
 		return append(
-			socksLink(userConfig["socks"], Addrs),
-			httpLink(userConfig["http"], Addrs)...,
+			socksLink(socksCfg, Addrs),
+			httpLink(httpCfg, Addrs)...,
 		)
 	case "shadowsocks":
 		return shadowsocksLink(userConfig, *inbound, Addrs)

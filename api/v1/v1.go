@@ -50,6 +50,9 @@ type Controller struct {
 	cfSvc       service.CloudflareService
 	logSvc      service.ApiLogService
 	subSvc      service.SubService
+
+	// provisionSvc 节点交付编排 —— 主控驱动本节点自动建 DNS / 签证书 / 建入站
+	provisionSvc service.ProvisionService
 }
 
 func New(g *gin.RouterGroup) *Controller {
@@ -186,6 +189,11 @@ func (a *Controller) register(g *gin.RouterGroup) {
 	sui.POST("/cloudflare/zones", a.cfListZones)
 	sui.POST("/cloudflare/dns/upsert-a", a.cfUpsertA)
 	sui.POST("/cloudflare/tls/issue", a.cfIssueTLS)
+
+	// 节点交付(主控自动化装机的第二段:面板装好之后把节点配成可售状态)
+	sui.GET("/provision/presets", a.provisionPresets)
+	sui.POST("/provision/apply", a.provisionApply)
+	sui.GET("/provision/state", a.provisionState)
 	// sing-box 完整运行时配置(getSingboxConfig 等价)
 	sui.GET("/singbox/raw-config", a.suiSingboxRaw)
 
@@ -864,6 +872,19 @@ func (a *Controller) saveResource(c *gin.Context, object, action string) {
 	OK(c, gin.H{"object": object, "action": action, "affected": objs})
 }
 
+// deleteResource 删 inbounds / outbounds / endpoints。
+//
+// **ConfigService.Save 的 "del" 分支按 tag 删,不是 id。** 三个 service 的
+// del 分支第一行都是 `json.Unmarshal(data, &tag)`,期望一个 JSON 字符串。
+//
+// 此前这里直接把路径里的数字 id 序列化过去(`json.Marshal(n)` → `1`),于是
+// 三个 DELETE 端点 **100% 失败**,统一回
+// `json: cannot unmarshal number into Go value of type string`。
+// 影响不止 API 调用方:主控管理端的"删除入站"按钮走的是节点透传,
+// 也就是说运营在面板上根本删不掉任何入站,而报错信息完全指不到原因。
+//
+// REST 路径用 id 是对的(它是资源标识),所以修法是在这里把 id 翻成 tag,
+// 而不是改对外契约。
 func (a *Controller) deleteResource(c *gin.Context, object string) {
 	id := c.Param("id")
 	n, err := strconv.Atoi(id)
@@ -871,15 +892,49 @@ func (a *Controller) deleteResource(c *gin.Context, object string) {
 		BadRequest(c, "invalid_id", "id must be integer")
 		return
 	}
+
+	tag, err := lookupResourceTag(object, uint(n))
+	if err != nil {
+		NotFound(c, object+"_not_found", err.Error())
+		return
+	}
+
 	hostname := c.Request.Host
 	username := c.GetString("api_token_user")
-	idJson, _ := json.Marshal(n)
-	objs, err := a.configSvc.Save(object, "del", idJson, "", username, hostname)
+	tagJson, _ := json.Marshal(tag)
+	objs, err := a.configSvc.Save(object, "del", tagJson, "", username, hostname)
 	if err != nil {
 		BadRequest(c, mapSaveErr(err, "delete_failed"), err.Error())
 		return
 	}
-	OK(c, gin.H{"deleted": true, "id": n, "affected": objs})
+	OK(c, gin.H{"deleted": true, "id": n, "tag": tag, "affected": objs})
+}
+
+// lookupResourceTag 按 id 查出资源的 tag(删除路径要用它)。
+//
+// 三张表结构一致(id + tag),但类型不同,所以逐个分支查 —— 用表名字符串
+// 拼 SQL 更短,却会把一个来自路由的 object 值送进 SQL,不值得。
+func lookupResourceTag(object string, id uint) (string, error) {
+	db := database.GetDB()
+	var tag string
+	var err error
+	switch object {
+	case "inbounds":
+		err = db.Model(&model.Inbound{}).Select("tag").Where("id = ?", id).Scan(&tag).Error
+	case "outbounds":
+		err = db.Model(&model.Outbound{}).Select("tag").Where("id = ?", id).Scan(&tag).Error
+	case "endpoints":
+		err = db.Model(&model.Endpoint{}).Select("tag").Where("id = ?", id).Scan(&tag).Error
+	default:
+		return "", fmt.Errorf("unsupported object: %s", object)
+	}
+	if err != nil {
+		return "", err
+	}
+	if tag == "" {
+		return "", fmt.Errorf("%s not found: %d", object, id)
+	}
+	return tag, nil
 }
 
 // derefMaps 把 *[]map[string]interface{} 解引用成 []map[string]any。
