@@ -72,7 +72,9 @@ func RenewPanelCertIfExpiring() (bool, error) {
 		return false, common.NewError("读取 webCertFile 失败: ", err.Error())
 	}
 	if certFile == "" {
-		// 面板跑在 HTTP 上(没配证书)——这是合法配置,不是故障
+		// 面板跑在 HTTP 上(没配证书)——这是合法配置,不是故障。
+		// 仍然打一条:否则"自动续签没在跑"与"没有证书要续"在日志里长得一模一样。
+		logger.Info("PanelSSLRenew: 未配置面板证书(webCertFile 为空),跳过")
 		return false, nil
 	}
 
@@ -81,6 +83,12 @@ func RenewPanelCertIfExpiring() (bool, error) {
 		return false, common.NewError("解析面板证书失败: ", info.Error)
 	}
 	if !shouldRenewPanelCert(info) {
+		// 🩸 心跳:这条 info 是"自动续签确实在跑"的唯一凭据。
+		// 上一次同类事故(APIAbuseGuard 在生产从未运行过一秒)就是因为防御性代码
+		// 平时零输出 —— "没在跑"和"在跑但没到阈值"外观完全一致,而等到真该它干活时
+		// 你会先去调阈值。每 6h 一条,不算刷屏。
+		logger.Info("PanelSSLRenew: 证书剩余 ", info.DaysLeft, " 天(阈值 ",
+			PanelCertRenewThresholdDays, "),无需续签")
 		return false, nil
 	}
 
