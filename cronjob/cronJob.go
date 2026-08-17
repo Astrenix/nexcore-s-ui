@@ -61,6 +61,15 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 		// 订阅 winner 巡检 — 每 5min 检查所有 pool-{cc} 出站当前 winner 是否还活;
 		// 死了立刻从 sub_nodes 同国家次优 alive 节点 re-elect
 		c.cron.AddJob("@every 5m", NewSubWinnerCheckJob())
+		// 面板证书自愈 — 每 6h 查一次 webCertFile,剩余 < 30 天自动 ACME 续签 + 重启加载。
+		// 2026-08-17:此前续签只有设置页的手动按钮,证书 8/8 静默过期 → 主控调节点 API
+		// 全部 x509 失败 → 节点 offline、用户买了流量包一条线路都开不出来。
+		// 首检延后 2min:面板刚起来时 DNS / 网络可能还没就绪,而这作业会跑 ACME。
+		go func() {
+			time.Sleep(2 * time.Minute)
+			NewCertRenewJob().Run()
+		}()
+		c.cron.AddJob("@every 6h", NewCertRenewJob())
 	}()
 
 	return nil
