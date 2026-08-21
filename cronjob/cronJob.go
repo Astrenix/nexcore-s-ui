@@ -12,6 +12,37 @@ type CronJob struct {
 	cron *cron.Cron
 }
 
+// cronChainOptions 返回 cron 的 wrapper 链。
+//
+// 🩸 E510:Recover 必须在链的【最内层】—— 顺序反了会静默废掉这个 job。
+//
+// NewChain(m1,m2).Then(job) 展开成 m1(m2(job))。写成 (Recover, Skip) 看起来"更安全"
+// (先兜住一切),实际是错的,因为 robfig/cron v3.0.1 的 SkipIfStillRunning 是:
+//
+//	case v := <-ch:
+//	    j.Run()      // panic 从这里抛出
+//	    ch <- v      // ← 不是 defer,panic 时【永远不执行】
+//
+// panic 穿过它 → 令牌永久丢失 → 该 job 之后每一次触发都落进 default 分支被 skip。
+// 进程是活下来了,但那个作业从此再也不跑,而且日志里只有平静的 "skip"。
+// 反过来 Skip(Recover(job)) 让 Recover 先吞掉 panic,j.Run() 正常返回,令牌归还。
+//
+// 这条是【行为】守卫当场逼出来的:我第一版就写成了 (Recover, Skip),
+// 而"链里有没有 cron.Recover"这种形态断言对顺序完全是瞎的。
+//
+// 此前链里只有 SkipIfStillRunning,而 robfig/cron v3 默认【不】兜 panic:
+// 任何一个 job panic 都会带走整个面板进程 → 主控调节点 API 全部失败 → 节点 offline,
+// 与 2026-08-17 那次「证书静默过期让节点从主控视角消失」是同一类后果。
+// 8 个 job 里只有 CertRenewJob 自己 defer 了 recover(它的注释就写着「panic 不能带走
+// 整个 cron」)—— 规矩被写下来了,却只落实在写它的那一个 job 上。
+// 挂在 chain 上而不是逐个 job 加,是因为后者对【将来新增的 job】无效。
+//
+// 抽成函数是为了让守卫能拿到【生产实际用的那条链】去跑真实的 panic job ——
+// 在测试里另写一条链等于什么都没验。
+func cronChainOptions() cron.Option {
+	return cron.WithChain(cron.SkipIfStillRunning(cronLogger{}), cron.Recover(cronLogger{}))
+}
+
 func NewCronJob() *CronJob {
 	return &CronJob{}
 }
@@ -37,7 +68,7 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 	c.cron = cron.New(
 		cron.WithLocation(loc),
 		cron.WithSeconds(),
-		cron.WithChain(cron.SkipIfStillRunning(cronLogger{})),
+		cronChainOptions(),
 	)
 	c.cron.Start()
 
