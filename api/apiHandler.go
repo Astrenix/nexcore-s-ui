@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"strings"
 
 	apiv1 "github.com/alireza0/s-ui/api/v1"
 	"github.com/alireza0/s-ui/service"
@@ -26,13 +25,41 @@ func NewAPIHandler(g *gin.RouterGroup, a2 *APIv2Handler) {
 
 func (a *APIHandler) initRouter(g *gin.RouterGroup) {
 	g.Use(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if !strings.HasSuffix(path, "login") && !strings.HasSuffix(path, "logout") {
+		// 🩸 E571:豁免判定必须【精确匹配 action】,不能对 path 做后缀匹配。
+		//
+		// 原写法是 strings.HasSuffix(path, "login") —— 当前 53 个 action 里恰好
+		// 只有 login / logout 以这两个词结尾,所以行为上等价、没出过事。
+		// 但它是【按子串建模】:下一个人加 relogin / autologin / sublogin,
+		// 那个 action 就会静默地【完全不鉴权】,而本 handler 里挂着
+		// getdb(导出整个 settings 表 —— 含 JWT 签名密钥 secret 与
+		// Cloudflare API Token)、importdb、cfCredentials 这些动作。
+		// 加 action 的人不会想到去看鉴权中间件,鉴权中间件也不会因此变红。
+		//
+		// 同族:UA 判定曾用裸子串 "bot",把机型名含 bot 的真人判成爬虫(2026-08 实测)。
+		if !isAuthExemptAction(c.Param("postAction"), c.Param("getAction")) {
 			checkLogin(c)
 		}
 	})
 	g.POST("/:postAction", a.postHandler)
 	g.GET("/:getAction", a.getHandler)
+}
+
+// authExemptActions 是【唯一】不需要登录态的两个动作。
+// 精确匹配,不做前缀/后缀/包含 —— 新增 action 默认落在"需要鉴权"这一侧,
+// 这个默认方向是本函数存在的全部意义。
+var authExemptActions = map[string]bool{
+	"login":  true,
+	"logout": true,
+}
+
+// isAuthExemptAction 判定这次请求的 action 是否豁免登录。
+// 抽成纯函数是为了能直接对它跑行为断言 —— 鉴权判定错一次的代价是
+// 整个面板数据库(含密钥)可被匿名下载。
+func isAuthExemptAction(postAction, getAction string) bool {
+	if postAction != "" {
+		return authExemptActions[postAction]
+	}
+	return authExemptActions[getAction]
 }
 
 func (a *APIHandler) postHandler(c *gin.Context) {
