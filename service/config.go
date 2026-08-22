@@ -143,6 +143,11 @@ func (s *ConfigService) StartCore() error {
 	logger.Info("starting core")
 	rawConfig, err := s.GetConfig("")
 	if err != nil {
+		// 🩸 E565:这条此前是【裸 return err,零日志】。
+		// 它前面的 StopCore 已经把 core 停了并记下 "sing-box stopped",
+		// 于是现场只剩那一行 —— 看起来像有人主动停的,排查会被直接带偏,
+		// 而真相是 core 停了起不来、该节点全部入站已下线。
+		logger.Error("start sing-box err (get config):", err.Error())
 		return err
 	}
 	if err := corePtr.Start(*rawConfig); err != nil {
@@ -218,7 +223,11 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 			tx.Commit()
 			// Try to start core if it is not running
 			if !corePtr.IsRunning() {
-				s.StartCore()
+				// E565:此前是裸调用。core 没在跑才走到这里,
+				// 也就是说这次启动失败 = 保存成功了但节点仍然没有入站。
+				if err := s.StartCore(); err != nil {
+					logger.Error("保存后补启动 core 失败,该节点仍无入站:", err.Error())
+				}
 			}
 		} else {
 			tx.Rollback()
@@ -255,7 +264,14 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 			// 该节点全部入站下线,而主控只看得到「节点失联」,归因极难。
 			go func() {
 				defer common.Recover("config: 屏蔽规则变更后重启 core")
-				_ = s.RestartCore()
+				// E565:异步路径不能吞错误。这两个函数都是【先 Stop 再 Start】,
+				// Start 失败 = core 已停且起不来 = 该节点全部入站下线,
+				// 而用户看到的是「保存成功」(响应早已返回)。
+				// 同步路径(apiService.go RestartSb / v1.go coreRestart)都把 err 交给了调用方,
+				// 异步这半此前直接 `_ =` —— 同一个函数,两条路径只守住一半。
+				if err := s.RestartCore(); err != nil {
+					logger.Error("屏蔽规则变更后重启 core 失败,该节点可能已无入站:", err.Error())
+				}
 			}()
 		}
 	case "config":
@@ -273,7 +289,11 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		// panic → 面板进程退出 → 节点全下线,而用户只是想改个配置。
 		go func() {
 			defer common.Recover("config: 保存整份 config 后重启 core")
-			_ = s.restartCoreWithConfig(configData)
+			// E565:同上。这条尤其要紧 —— 触发它的是用户粘贴的整份配置,
+			// 而 SanitizeRawConfig 的存在本身说明「配置不兼容」是预期内的常见情况。
+			if err := s.restartCoreWithConfig(configData); err != nil {
+				logger.Error("保存 config 后重启 core 失败,该节点可能已无入站:", err.Error())
+			}
 		}()
 	case "settings":
 		err = s.SettingService.Save(tx, data)
