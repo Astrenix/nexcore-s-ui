@@ -1,0 +1,53 @@
+name: Test
+
+# 独立的测试 workflow —— 【刻意】不并进 release.yml。
+#
+# 2026-08-22 E570。此前节点仓 .github/workflows/ 只有 release.yml 与 windows.yml,
+# 两个都零 `go test`;build.sh / update.sh / install.sh 也零。也就是说仓库里
+# 15 个测试文件(含 E510/E512/E564~E569 这几轮立的 7 个守卫)【没有任何自动流程
+# 会跑它们】—— 守卫存在但不生效,下一个改这些代码的人不会被拦住。
+# 这与主仓 E519 的「66 条 MySQL 用例自写下之日起从未跑过」是同一个类。
+#
+# 三条设计决定,都有理由:
+#
+# ① 不往 release.yml 里加。那个 workflow 是发版链路(push main + '**.go' 就触发),
+#    测试红了不该卡住发版 —— 主仓 CLAUDE.md 明确记过这一条。两者独立跑。
+#
+# ② 不加 paths 过滤。测试全跑只要几秒,而 paths 写漏一类文件就等于那类改动
+#    永远不跑测试 —— 「只认一种写法」在本仓已经复发过很多次,不值得为省几秒冒这个险。
+#
+# ③ 【不】跑 gofmt。仓库里现有 13 个未格式化文件(api/v1/middleware.go、
+#    core/main.go、service/inbounds.go 等,全是既有的、与本轮改动零交集)。
+#    接进来只有两个结局:恒红,或者被迫加 continue-on-error 变成假绿。
+#    主仓 CI 就是因为这个才只跑 tgworker。要接 gofmt,先把那 13 个清干净。
+#
+# go test 与 go vet 在接入时都实测全绿(FAIL 0),-race 也是 —— 所以不会恒红。
+# 也【没有】continue-on-error:红就是红,那才是这个 workflow 存在的意义。
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          # 跟着仓库的 go.mod 走,不在这里另立一个版本号 ——
+          # 两处写死版本迟早分叉,而分叉那天没人会想到看 CI 配置。
+          go-version-file: go.mod
+
+      # -race 一并开:接入时实测全绿。节点仓在这点上比主仓强 ——
+      # 主仓 internal/service 有 17 个 DATA RACE,-race 在那个包至今不可用。
+      - name: Test
+        run: go test -race ./...
+
+      - name: Vet
+        run: go vet ./...
