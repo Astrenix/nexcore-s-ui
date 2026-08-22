@@ -32,12 +32,63 @@ const (
 	// 而且 8/6 那次事故里 crash-loop 反复撞 429、retry-after 被无限顺延,
 	// 恢复窗口反而被自己毒化。宁可慢,不可密。
 	panelCertRenewMinInterval = 6 * time.Hour
+
+	// panelCertRenewLastTrySettingKey 上次续签【尝试】时间(RFC3339),持久化在 settings 表。
+	//
+	// 🩸 为什么不能只靠上面那个内存变量:本作业在面板启动 2 分钟后就会跑一次
+	// (cronjob/cronJob.go 的首检 goroutine),而进程内变量【一重启就归零】——
+	// 于是"6 小时最小间隔"对重启完全无效。
+	// 而重启恰恰是本节流要防的场景:上面写的 8/6 事故形态就是 crash-loop 反复撞 429;
+	// 运维在证书出问题时最自然的动作也是重启面板,每重启一次就多烧一张 LE 配额
+	// (同域名每周 5 张重复证书),打满之后 429 的 retry-after 可达数天 ——
+	// 恢复窗口被自己毒化,正是那次事故的形态。
+	//
+	// 不走 getString/defaultValueMap:那张表会被 setting.go:92 整表遍历成设置页 payload,
+	// 内部记账键不该出现在面板界面上。直接 getSetting + saveSetting。
+	panelCertRenewLastTrySettingKey = "panelCertRenewLastTry"
 )
 
 var (
 	panelCertRenewMu      sync.Mutex
 	panelCertRenewLastTry time.Time
 )
+
+// loadPanelCertRenewLastTry 读持久化的上次尝试时间。
+//
+// 读不到一律返回零值(= 节流放行)。**这个方向是刻意的**:
+// fail-open 的代价是"多试一次 ACME",fail-closed 的代价是"证书到期了却因为
+// 读不到一个时间戳而永远不续" —— 后者正是本文件开头那次事故本身。
+func loadPanelCertRenewLastTry(settingSvc *SettingService) time.Time {
+	st, err := settingSvc.getSetting(panelCertRenewLastTrySettingKey)
+	if err != nil || st == nil {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, st.Value)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// shouldThrottlePanelCertRenew 纯判定:这次尝试该不该被节流挡下。
+//
+// 与 shouldRenewPanelCert 同样抽成纯函数,理由见那里 —— 这条判断错一次的代价是
+// 烧光 LE 配额(见 panelCertRenewMinInterval 的注释),而它涉及两个时间来源,
+// 光看调用点读不出「重启后还挡不挡得住」。
+//
+// 取 mem / persisted 里更晚的那个:
+//   - persisted 负责跨重启(内存那份一重启就归零,而重启正是要防的场景)
+//   - mem 负责同进程内的快速路径,并且在 saveSetting 失败时仍然挡得住本进程
+func shouldThrottlePanelCertRenew(mem, persisted, now time.Time) bool {
+	lastTry := mem
+	if persisted.After(lastTry) {
+		lastTry = persisted
+	}
+	if lastTry.IsZero() {
+		return false
+	}
+	return now.Sub(lastTry) < panelCertRenewMinInterval
+}
 
 // shouldRenewPanelCert 纯判定:这张证书该不该续。
 //
@@ -93,12 +144,19 @@ func RenewPanelCertIfExpiring() (bool, error) {
 	}
 
 	// 到这里已经确定"该续了"。节流只挡重复**尝试**,不挡判定 —— 判定结果要能进日志。
-	if !panelCertRenewLastTry.IsZero() && time.Since(panelCertRenewLastTry) < panelCertRenewMinInterval {
+	if shouldThrottlePanelCertRenew(panelCertRenewLastTry, loadPanelCertRenewLastTry(&settingSvc), time.Now()) {
 		logger.Info("PanelSSLRenew: 证书剩余 ", info.DaysLeft, " 天需续签,但距上次尝试不足 ",
 			panelCertRenewMinInterval, ",本轮跳过")
 		return false, nil
 	}
 	panelCertRenewLastTry = time.Now()
+	// 先落盘再跑 ACME:顺序反了的话,ACME 挂住/进程被杀期间这次尝试就没被记下来,
+	// 重启后又是一次全新尝试 —— 那正是要防的 crash-loop 形态。
+	if err := settingSvc.saveSetting(panelCertRenewLastTrySettingKey,
+		panelCertRenewLastTry.Format(time.RFC3339)); err != nil {
+		// 记不下来 = 重启后节流失效。不阻断本次续签(证书要紧),但必须出声。
+		logger.Warning("PanelSSLRenew: 无法持久化续签尝试时间,重启后节流会失效: ", err.Error())
+	}
 
 	domain, err := settingSvc.GetWebDomain()
 	if err != nil {
