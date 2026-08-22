@@ -49,7 +49,7 @@ func (j *SubRefreshJob) Run() {
 			continue
 		}
 		logger.Info("SubRefreshJob: sub#", sub.Id, " refreshed total=", res.Total,
-			" parsed=", res.Parsed, " alive=", res.Alive)
+			" parsed=", res.Parsed, " alive=", res.Alive, " skipped=", res.Skipped)
 	}
 }
 

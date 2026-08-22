@@ -197,12 +197,20 @@ func (s *SubService) RefreshSub(ctx context.Context, id uint) (*RefreshResult, e
 	// 探测(并发 8)
 	outcomes := ProbeNodes(ctx, nodes)
 	aliveCount := 0
+	skippedCount := 0
 	for _, o := range outcomes {
+		if o.Skipped {
+			skippedCount++
+			continue
+		}
 		if o.Alive {
 			aliveCount++
 		}
 	}
 	rr.Alive = aliveCount
+	// Skipped 单独计:它既不是 alive 也不是 dead,折进任何一边都会让
+	// "本次刷新健不健康"这个判断失真(全跳过时 alive=0 看着像整个订阅挂了)。
+	rr.Skipped = skippedCount
 
 	// upsert + 删除本次未出现的
 	if err := s.applyOutcomes(id, outcomes); err != nil {
@@ -223,12 +231,15 @@ func (s *SubService) RefreshSub(ctx context.Context, id uint) (*RefreshResult, e
 
 // RefreshResult 单次刷新的 summary,API + cron log 用。
 type RefreshResult struct {
-	SubId  uint   `json:"sub_id"`
-	Total  int    `json:"total"`  // 订阅里候选行数
-	Parsed int    `json:"parsed"` // 成功解析的链接数
-	Alive  int    `json:"alive"`  // 探测存活数
-	OK     bool   `json:"ok"`
-	Error  string `json:"error,omitempty"`
+	SubId  uint `json:"sub_id"`
+	Total  int  `json:"total"`  // 订阅里候选行数
+	Parsed int  `json:"parsed"` // 成功解析的链接数
+	Alive  int  `json:"alive"`  // 探测存活数
+	// Skipped:时间预算耗尽、本轮压根没探的节点数。它们在库里保留上一轮的
+	// 探测结果,不会被误判成 dead。持续 >0 说明订阅太大或超时太紧。
+	Skipped int    `json:"skipped,omitempty"`
+	OK      bool   `json:"ok"`
+	Error   string `json:"error,omitempty"`
 }
 
 // applyOutcomes:
@@ -243,7 +254,14 @@ func (s *SubService) applyOutcomes(subId uint, outcomes []ProbeOutcome) error {
 	// 组装本轮全部行 + 收集(server,port)白名单,避免原先"每节点先 First 再 Save"
 	// 的 N+1 与"全表 Find 后逐条 Delete"的第二次 N+1 —— 大订阅刷新时这是一个
 	// 长写事务持锁的主因,会跟 StatsJob/DepleteJob 抢 SQLite 写锁触发 busy。
+	//
+	// 🩸 分两组写:探测过的(rows)与【没探测的】(skippedRows)。
+	// 后者是 ProbeNodes 时间预算耗尽剩下的 —— 它们的 alive/exit_ip/latency 一律【不动】,
+	// 保留上一轮真实结果。把"没测"当"测出来是死的"写进库,会让 ElectWinners
+	// 选不出 winner、pool-{cc} 出站被摘,用户直接断线;而节点顺序稳定,
+	// 每轮死的还都是同一批尾部节点。
 	rows := make([]model.SubNode, 0, len(outcomes))
+	skippedRows := make([]model.SubNode, 0)
 	servers := make([]string, 0, len(outcomes))
 	ports := make([]uint16, 0, len(outcomes))
 	seen := make(map[string]bool, len(outcomes))
@@ -253,6 +271,22 @@ func (s *SubService) applyOutcomes(subId uint, outcomes []ProbeOutcome) error {
 			continue // 同订阅内重复 server:port,去重避免 upsert 冲突
 		}
 		seen[key] = true
+		if o.Skipped {
+			// 只带订阅解析出来的字段(这部分本轮确实是新的),探测列一个都不填。
+			// 首次出现的节点会以 alive=false 插入 —— 那是对的:没验证过的节点
+			// 不该被选成 winner 去接用户流量。
+			skippedRows = append(skippedRows, model.SubNode{
+				SubId:      subId,
+				Remark:     o.Node.Remark,
+				Type:       o.Node.Type,
+				Server:     o.Node.Server,
+				ServerPort: o.Node.ServerPort,
+				Options:    o.Node.Options,
+			})
+			servers = append(servers, o.Node.Server)
+			ports = append(ports, o.Node.ServerPort)
+			continue
+		}
 		rows = append(rows, model.SubNode{
 			SubId:       subId,
 			Remark:      o.Node.Remark,
@@ -284,10 +318,23 @@ func (s *SubService) applyOutcomes(subId uint, outcomes []ProbeOutcome) error {
 		}).CreateInBatches(rows, batch).Error; err != nil {
 			return err
 		}
+		// 没探测的那批:DoUpdates 【刻意】不含 alive / exit_ip / latency_ms /
+		// last_error / last_check_at —— 探测结果保持上一轮的值,last_check_at
+		// 也不刷新(它的语义是"上次真的探过它是什么时候",没探就不该往前推)。
+		if len(skippedRows) > 0 {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "sub_id"}, {Name: "server"}, {Name: "server_port"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"remark", "type", "options",
+				}),
+			}).CreateInBatches(skippedRows, batch).Error; err != nil {
+				return err
+			}
+		}
 
 		// 删除本轮未出现的旧节点:一条 NOT IN 批量删,替代原来的全表扫 + 逐条 Delete。
 		// SQLite 无原生元组 IN,用 server||':'||port 拼 key 比对本轮白名单。
-		keys := make([]string, 0, len(rows))
+		keys := make([]string, 0, len(servers))
 		for i := range servers {
 			keys = append(keys, fmt.Sprintf("%s:%d", servers[i], ports[i]))
 		}
