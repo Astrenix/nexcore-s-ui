@@ -21,6 +21,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/alireza0/s-ui/util/common"
 	"net/http"
 	"os"
 	"runtime"
@@ -233,12 +234,12 @@ func (a *Controller) serverStatus(c *gin.Context) {
 	all := a.serverSvc.GetStatus("cpu,mem,dsk,swp,net,sys,sbd")
 	st := *all
 	out := gin.H{
-		"cpu":     st["cpu"],
-		"mem":     st["mem"],
-		"disk":    st["dsk"],
-		"swap":    st["swp"],
-		"netIO":   st["net"],
-		"system":  st["sys"],
+		"cpu":        st["cpu"],
+		"mem":        st["mem"],
+		"disk":       st["dsk"],
+		"swap":       st["swp"],
+		"netIO":      st["net"],
+		"system":     st["sys"],
 		"goroutines": runtime.NumGoroutine(),
 		// 面板版本顶层字段(x-ui 兼容契约)— 主控 normalize 不再需要
 		"panelVersion": config.GetVersion(),
@@ -389,12 +390,13 @@ func (a *Controller) getOutbound(c *gin.Context) {
 
 // injectXuiOutboundFields 给 outbound map 加 x-ui 兼容字段(冗余注入,
 // 不删原 sing-box 字段)。
-//   protocol = type
-//   address  = server     (x-ui 风格)
-//   port     = server_port
-//   name     = tag
-//   enable   = true       (sing-box 出站没有 enable 字段,默认 true)
-//   remark   = ""         (x-ui 表单字段,sing-box 没有)
+//
+//	protocol = type
+//	address  = server     (x-ui 风格)
+//	port     = server_port
+//	name     = tag
+//	enable   = true       (sing-box 出站没有 enable 字段,默认 true)
+//	remark   = ""         (x-ui 表单字段,sing-box 没有)
 func injectXuiOutboundFields(m map[string]any) {
 	if _, ok := m["protocol"]; !ok {
 		m["protocol"] = m["type"]
@@ -753,6 +755,7 @@ func (a *Controller) deleteToken(c *gin.Context) {
 func (a *Controller) restartPanel(c *gin.Context) {
 	go func() {
 		// 异步触发 — 否则 panel 挂了,这个 handler 永远不返回
+		defer common.Recover("v1: 主控请求重启面板")
 		_ = (&service.PanelService{}).RestartPanel(2 * time.Second)
 	}()
 	OK(c, gin.H{"scheduled": true})
@@ -1018,7 +1021,9 @@ func (a *Controller) patchInboundEnable(c *gin.Context) {
 		NotFound(c, "inbound_not_found", "inbound not found: "+c.Param("id"))
 		return
 	}
-	var body struct{ Enable *bool `json:"enable"` }
+	var body struct {
+		Enable *bool `json:"enable"`
+	}
 	if err := c.ShouldBindJSON(&body); err != nil || body.Enable == nil {
 		BadRequest(c, "invalid_body", "body must be {\"enable\":true|false}")
 		return
@@ -1099,11 +1104,12 @@ func (a *Controller) listInboundClients(c *gin.Context) {
 
 // listInboundClientTraffics 返回该入站下所有 client 的 x-ui 风格流量行。
 // 字段映射:
-//   email      = client.name      (s-ui 用 name 当 email 等价物)
-//   up/down    = client.up/down
-//   total      = client.volume    (0 = 不限)
-//   expiryTime = client.expiry    (epoch ms,0 = 不限期)
-//   enable     = client.enable
+//
+//	email      = client.name      (s-ui 用 name 当 email 等价物)
+//	up/down    = client.up/down
+//	total      = client.volume    (0 = 不限)
+//	expiryTime = client.expiry    (epoch ms,0 = 不限期)
+//	enable     = client.enable
 func (a *Controller) listInboundClientTraffics(c *gin.Context) {
 	ib, err := a.findInboundByID(c.Param("id"))
 	if err != nil {
@@ -1170,7 +1176,9 @@ func (a *Controller) testOutbound(c *gin.Context) {
 
 func (a *Controller) patchClientEnable(c *gin.Context) {
 	ident := c.Param("identifier")
-	var body struct{ Enable *bool `json:"enable"` }
+	var body struct {
+		Enable *bool `json:"enable"`
+	}
 	if err := c.ShouldBindJSON(&body); err != nil || body.Enable == nil {
 		BadRequest(c, "invalid_body", "body must be {\"enable\":true|false}")
 		return
@@ -1282,7 +1290,9 @@ func (a *Controller) checkPort(c *gin.Context) {
 
 // checkUpdate 拉 GitHub latest release 比对当前版本 — 后端做 fetch 是为了
 // 绕开 CORS,主控/前端不必直接 hit GitHub。返:
-//   { current, latest, hasUpdate, latestUrl, latestPublishedAt, upgradeCmd }
+//
+//	{ current, latest, hasUpdate, latestUrl, latestPublishedAt, upgradeCmd }
+//
 // 不做自动 panel 重启 — sui binary 自更新涉及 systemd reload,风险太高。
 // 用户拿到 upgradeCmd 后在 SSH 终端跑即可。
 func (a *Controller) checkUpdate(c *gin.Context) {
@@ -1330,13 +1340,13 @@ func (a *Controller) checkUpdate(c *gin.Context) {
 	hasUpdate := semverCompare(current, latestVer) < 0
 
 	OK(c, gin.H{
-		"current":            current,
-		"latest":             latestVer,
-		"latestTag":          latest.TagName,
-		"hasUpdate":          hasUpdate,
-		"latestUrl":          latest.HTMLURL,
-		"latestPublishedAt":  latest.PublishedAt,
-		"upgradeCmd":         "bash <(curl -Ls https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/update.sh)",
+		"current":           current,
+		"latest":            latestVer,
+		"latestTag":         latest.TagName,
+		"hasUpdate":         hasUpdate,
+		"latestUrl":         latest.HTMLURL,
+		"latestPublishedAt": latest.PublishedAt,
+		"upgradeCmd":        "bash <(curl -Ls https://raw.githubusercontent.com/DoBestone/nexcore-s-ui/main/update.sh)",
 	})
 }
 
@@ -1489,4 +1499,3 @@ func readFileLines(path string) ([]string, error) {
 	}
 	return strings.Split(string(b), "\n"), nil
 }
-

@@ -1,6 +1,7 @@
 package cronjob
 
 import (
+	"github.com/alireza0/s-ui/util/common"
 	"time"
 
 	"github.com/alireza0/s-ui/logger"
@@ -73,6 +74,10 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 	c.cron.Start()
 
 	go func() {
+		// 🩸 E564:这个 goroutine 负责【注册全部定时作业】。它 panic 不只是带走进程,
+		// 而是在此之前就已经让后面的 AddJob 一个都没执行 —— 统计、配额、证书续签全不跑。
+		// cron chain 的 Recover(E510)只保护【已注册作业的执行】,保护不了注册过程本身。
+		defer common.Recover("cronjob: 注册定时作业")
 		// Start stats job
 		c.cron.AddJob("@every 10s", NewStatsJob(trafficAge > 0))
 		// 客户端 expiry/quota — Basic Auth 协议(mixed/socks/http/naive)

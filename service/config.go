@@ -251,7 +251,12 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		// 跟 case "config" 同样异步 restart,Save 不阻塞返回。
 		err = s.BlockRuleService.Save(tx, act, data)
 		if err == nil {
-			go func() { _ = s.RestartCore() }()
+			// 🩸 E564:重启 sing-box core。panic 会带走整个面板进程 =
+			// 该节点全部入站下线,而主控只看得到「节点失联」,归因极难。
+			go func() {
+				defer common.Recover("config: 屏蔽规则变更后重启 core")
+				_ = s.RestartCore()
+			}()
 		}
 	case "config":
 		// 整段 config JSON 也跑 sanitize:用户从 xray/v2ray 等粘贴整份配置时
@@ -263,7 +268,13 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 		}
 		configData := make(json.RawMessage, len(data))
 		copy(configData, data)
-		go func() { _ = s.restartCoreWithConfig(configData) }()
+		// 🩸 E564:本轮危害最高的一处 —— 触发时机是【用户粘贴整份 config JSON 并保存】,
+		// 处理的是用户可控输入(SanitizeRawConfig 之后仍是任意 JSON)。
+		// panic → 面板进程退出 → 节点全下线,而用户只是想改个配置。
+		go func() {
+			defer common.Recover("config: 保存整份 config 后重启 core")
+			_ = s.restartCoreWithConfig(configData)
+		}()
 	case "settings":
 		err = s.SettingService.Save(tx, data)
 	default:
@@ -390,13 +401,14 @@ func injectBlockRules(routeRaw json.RawMessage) json.RawMessage {
 // reload 整体失败)。
 //
 // 翻译表:
-//   domain    → domain_suffix(覆盖更广,匹配 x-ui 的"包含子域"行为)
-//   ip        → ip_cidr
-//   geosite   → geosite
-//   geoip     → geoip
-//   port      → port (数字数组)
-//   protocol  → protocol(tls/http/quic ... sing-box sniff 后的 protocol 名)
-//   source    → source_ip_cidr
+//
+//	domain    → domain_suffix(覆盖更广,匹配 x-ui 的"包含子域"行为)
+//	ip        → ip_cidr
+//	geosite   → geosite
+//	geoip     → geoip
+//	port      → port (数字数组)
+//	protocol  → protocol(tls/http/quic ... sing-box sniff 后的 protocol 名)
+//	source    → source_ip_cidr
 func blockRuleToRouteRule(br model.BlockRule) map[string]any {
 	values := splitTrim(br.Value, ",")
 	if len(values) == 0 {

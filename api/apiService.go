@@ -290,6 +290,9 @@ func (a *ApiService) PanelSslIssue(c *gin.Context) {
 	}
 	// 异步重启,先把响应送出去再关 — 否则用户连接 reset 看不到 success
 	go func() {
+		// E564:goroutine 里的 panic 无人捕获 = 整个面板进程退出。
+		// 这里本来就要重启,但【没有日志的退出】和【重启】在运维看来一模一样。
+		defer common.Recover("apiService: 异步重启面板(设置证书后)")
 		time.Sleep(2 * time.Second)
 		_ = a.PanelService.RestartPanel(1)
 	}()
@@ -327,6 +330,7 @@ func (a *ApiService) PanelSslRenew(c *gin.Context) {
 		return
 	}
 	go func() {
+		defer common.Recover("apiService: 异步重启面板(证书续签后)")
 		time.Sleep(2 * time.Second)
 		_ = a.PanelService.RestartPanel(1)
 	}()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"github.com/alireza0/s-ui/util/common"
 	"html/template"
 	"io"
 	"io/fs"
@@ -203,6 +204,7 @@ func (s *Server) Start() (err error) {
 	}
 
 	go func() {
+		defer common.Recover("web: HTTP 服务主循环")
 		s.httpServer.Serve(listener)
 	}()
 

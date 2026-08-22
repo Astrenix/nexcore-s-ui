@@ -63,6 +63,10 @@ func ProbeNodes(ctx context.Context, nodes []ParsedNode) []ProbeOutcome {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(i int, n ParsedNode) {
+			// E564:probeOne 处理【外部节点的响应】,panic 面在别人手里。
+			// Recover 放最前(defer 是 LIFO,它最后执行),wg.Done 与信号量归还照常先跑,
+			// 否则 wg.Wait() 会永远挂着 —— 那比进程退出更难查。
+			defer common.Recover("sub_probe: 并发探测节点")
 			defer wg.Done()
 			defer func() { <-sem }()
 			outcome := probeOne(ctx, salt, i, n)

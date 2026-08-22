@@ -42,7 +42,7 @@ func sanitizeToken(token string) string {
 	t = strings.TrimPrefix(t, "Bearer ")
 	t = strings.TrimPrefix(t, "bearer ")
 	// 去掉成对引号
-	t = strings.Trim(t, `"'` + "“”‘’")
+	t = strings.Trim(t, `"'`+"“”‘’")
 	return strings.TrimSpace(t)
 }
 
@@ -224,6 +224,9 @@ func (s *CloudflareService) DetectPublicIP() string {
 	for _, api := range apis {
 		wg.Add(1)
 		go func(url string) {
+			// E564:处理外部 HTTP 响应,panic 面在上游手里 —— Recover 放最前(最后执行),
+			// 这样 wg.Done / Body.Close 照常先跑完
+			defer common.Recover("cloudflare: 探测公网 IP")
 			defer wg.Done()
 			resp, err := client.Get(url)
 			if err != nil {
@@ -241,6 +244,7 @@ func (s *CloudflareService) DetectPublicIP() string {
 	}
 
 	go func() {
+		defer common.Recover("cloudflare: 等待探测收口")
 		wg.Wait()
 		close(ch)
 	}()

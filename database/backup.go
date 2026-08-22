@@ -288,6 +288,7 @@ func SendSighup() error {
 
 	// Send SIGHUP to the current process
 	go func() {
+		defer common.Recover("database: 恢复备份后重启进程")
 		time.Sleep(3 * time.Second)
 		if runtime.GOOS == "windows" {
 			err = process.Kill()
