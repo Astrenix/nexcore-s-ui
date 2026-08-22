@@ -32,7 +32,7 @@ func init() {
 type StatsService struct {
 }
 
-func (s *StatsService) SaveStats(enableTraffic bool) error {
+func (s *StatsService) SaveStats(enableTraffic bool) (err error) {
 	// 每轮构造全新快照 snap;函数所有返回路径统一在 defer 里一次性发布。
 	// 空快照即代表"无在线"——不论核心是否运行,旧快照都不该继续展示。
 	snap := &onlines{}
@@ -65,12 +65,18 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 		return nil
 	}
 
-	var err error
 	db := database.GetDB()
 	tx := db.Begin()
 	defer func() {
 		if err == nil {
-			tx.Commit()
+			// 🩸 E569:Commit 的错误必须接住并传出去。
+			// 此前是裸 `tx.Commit()` —— 提交失败时 err 仍是 nil,函数照常返回
+			// "成功",而数据一个字节都没落库。孪生对照:provision.go / cloudflare.go
+			// 早就写成 `if err := tx.Commit().Error; err != nil` —— 同一个决定,
+			// 这三处没跟上。改成具名返回值才能在 defer 里改写它。
+			if cerr := tx.Commit().Error; cerr != nil {
+				err = cerr
+			}
 		} else {
 			tx.Rollback()
 		}
@@ -104,7 +110,12 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 	if !enableTraffic {
 		return nil
 	}
-	return tx.Create(&stats).Error
+	// 🩸 必须先赋给 err 再 return:直接 `return tx.Create(...).Error` 时
+	// defer 看到的 err 仍是 nil,会去 Commit 一个最后一条语句失败的事务 ——
+	// 前面所有 UpdateColumn 照样提交,只有明细行丢了(半截状态),
+	// 而调用方拿到的是错误。两边说法不一致,库里的账对不上。
+	err = tx.Create(&stats).Error
+	return err
 }
 
 // GetTotals 按 resource 分组,返回每个 tag 的累计 up / down 字节数。
@@ -259,6 +270,7 @@ func (s *StatsService) GetOnlineIPs(resource, tag string) []string {
 	}
 	return st.QueryOnlineIPs(resource, tag, 60)
 }
+
 // ResetByTag 清掉单个 tag 在某 resource(inbound/outbound/user)下的全部
 // 历史流量样本。"重置流量"按钮调这个 — UI 上等同于把进度条归零。
 // 不存在的 tag 静默成功(idempotent),不报错。

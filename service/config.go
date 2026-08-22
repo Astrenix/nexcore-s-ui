@@ -212,15 +212,24 @@ func (s *ConfigService) CheckOutbound(tag string, link string) core.CheckOutboun
 	return core.CheckOutbound(corePtr.GetCtx(), tag, link)
 }
 
-func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initUsers string, loginUser string, hostname string) ([]string, error) {
-	var err error
-	var objs []string = []string{obj}
+func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initUsers string, loginUser string, hostname string) (objs []string, err error) {
+	objs = []string{obj}
 
 	db := database.GetDB()
 	tx := db.Begin()
 	defer func() {
 		if err == nil {
-			tx.Commit()
+			// 🩸 E569:Commit 的错误必须接住并传出去。
+			// 此前是裸 `tx.Commit()` —— 提交失败时 err 仍是 nil,函数照常返回
+			// "成功",而数据一个字节都没落库。孪生对照:provision.go / cloudflare.go
+			// 早就写成 `if err := tx.Commit().Error; err != nil` —— 同一个决定,
+			// 这三处没跟上。改成具名返回值才能在 defer 里改写它。
+			if cerr := tx.Commit().Error; cerr != nil {
+				err = cerr
+			}
+			if err != nil {
+				return // 提交失败,后面的补启动没有意义
+			}
 			// Try to start core if it is not running
 			if !corePtr.IsRunning() {
 				// E565:此前是裸调用。core 没在跑才走到这里,

@@ -20,8 +20,8 @@ type ClientService struct{}
 // linkRemarkCtx 给 LinkGenerator 拼 remark 用的 ctx,一次拉好避免每个
 // inbound × client 重复查 settings / outbounds / route.rules。
 type linkRemarkCtx struct {
-	NodeName       string            // 设置里的节点名称(直连模式 prefix)
-	InboundRelay   map[string]string // inboundTag → outboundTag(中转关系,_nb_binding 标记)
+	NodeName        string            // 设置里的节点名称(直连模式 prefix)
+	InboundRelay    map[string]string // inboundTag → outboundTag(中转关系,_nb_binding 标记)
 	OutboundDisplay map[string]string // outboundTag → DisplayName(空 fallback tag)
 }
 
@@ -539,12 +539,10 @@ func (s *ClientService) UpdateLinksByInboundChange(tx *gorm.DB, inbounds *[]mode
 	return nil
 }
 
-func (s *ClientService) DepleteClients() ([]uint, error) {
-	var err error
+func (s *ClientService) DepleteClients() (inboundIds []uint, err error) {
 	var clients []model.Client
 	var changes []model.Changes
 	var users []string
-	var inboundIds []uint
 
 	dt := time.Now().Unix()
 	db := database.GetDB()
@@ -552,7 +550,17 @@ func (s *ClientService) DepleteClients() ([]uint, error) {
 	tx := db.Begin()
 	defer func() {
 		if err == nil {
-			tx.Commit()
+			// 🩸 E569:Commit 的错误必须接住并传出去。
+			// 此前是裸 `tx.Commit()` —— 提交失败时 err 仍是 nil,函数照常返回
+			// "成功",而数据一个字节都没落库。孪生对照:provision.go / cloudflare.go
+			// 早就写成 `if err := tx.Commit().Error; err != nil` —— 同一个决定,
+			// 这三处没跟上。改成具名返回值才能在 defer 里改写它。
+			if cerr := tx.Commit().Error; cerr != nil {
+				err = cerr
+			}
+			if err != nil {
+				return // 提交失败就别再做 checkpoint
+			}
 			if err1 := db.Exec("PRAGMA wal_checkpoint(FULL)").Error; err1 != nil {
 				logger.Error("Error checkpointing WAL: ", err1.Error())
 			}

@@ -28,7 +28,11 @@ func MigrateDb() {
 	tx := db.Begin()
 	defer func() {
 		if err == nil {
-			tx.Commit()
+			// E569:提交失败必须出声。这是【迁移】—— 静默失败等于"程序说迁移完了、
+			// 库其实没变",下次启动 schema 对不上,而没人知道是这一步没落地。
+			if cerr := tx.Commit().Error; cerr != nil {
+				log.Fatal("migration commit failed (数据未落库): ", cerr)
+			}
 		} else {
 			tx.Rollback()
 		}
