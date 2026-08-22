@@ -37,6 +37,7 @@ package service
 import (
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"os"
 	"path/filepath"
@@ -182,4 +183,96 @@ func clItoa(n int) string {
 		n /= 10
 	}
 	return string(b)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LastUpdate 归零之后的兜底方向:必须回去查库,不能折叠成「没变化」。
+//
+// 2026-08-22 E567:LastUpdate 是包级 atomic.Int64,进程一重启就是 0。
+// CheckChanges 的 else 分支是 `LastUpdate.Load() > intLu` —— 0 大不过任何正数,
+// 所以少了 ==0 那条分支,重启后面板前端会【永远】被告知"没有变化",
+// 直到有人手动保存一次配置才恢复。没有报错、没有日志,界面只是一直显示旧配置。
+//
+// 现有实现是对的:==0 时回去查 Changes 表(持久化的真值),查完顺带把
+// LastUpdate 置为当前时间。这条分支承重且此前无人守 —— 它长得像"冗余的
+// 初始化判断",正是重构时最容易被"简化"掉的形状。
+// ─────────────────────────────────────────────────────────────────────────────
+func TestCheckChangesFallsBackToDBWhenLastUpdateIsZero(t *testing.T) {
+	body := clFuncBodySource(t, "config.go", "CheckChanges")
+	if body == "" {
+		t.Fatal("没提取到 CheckChanges 的函数体 —— 判据失效了,不是代码干净")
+	}
+
+	// ① 必须存在「LastUpdate 为零」的判断
+	if !strings.Contains(body, "LastUpdate.Load() == 0") {
+		t.Error("CheckChanges 里找不到 `LastUpdate.Load() == 0` 分支。\n" +
+			"LastUpdate 是进程内 atomic,重启即 0;而另一条分支是 `LastUpdate.Load() > intLu`,\n" +
+			"0 大不过任何正数 —— 少了这条分支,重启后前端会永远被告知「没有变化」,\n" +
+			"直到有人手动保存配置。无报错、无日志,只是界面一直显示旧配置。")
+	}
+	// ② 那条分支里必须真的去查库(而不是直接 return 一个常量)
+	if !strings.Contains(body, "model.Changes{}") {
+		t.Error("CheckChanges 的零值分支没有查 Changes 表。\n" +
+			"归零之后唯一还靠得住的真值来源就是库;返回常量等于把「不知道」\n" +
+			"折叠成一个具体答案,而两个方向各有各的坏法(恒 true = 前端空转刷新,\n" +
+			"恒 false = 前端永远看不到新配置)。")
+	}
+}
+
+// clFuncBodySource 取指定文件里某个函数的【函数体源码】。
+//
+// 🩸 承重的是【用 printer 从 AST 节点重打】,不是 parse flag。
+// 直接按 Pos/End 切原始字节会把注释一起切进来,而修复注释总会引用它修的那段
+// 代码 —— 本仓已因此假绿一次、假红一次。判据要看的是代码,不是关于代码的话。
+//
+// 不带 parser.ParseComments 是顺手为之,但【它并不承重】:printer.Fprint 打印的是
+// fd.Body 这个节点,而注释挂在 ast.File 上,给不给 ParseComments 都不会被打进来。
+// 这一点是 2026-08-22 E567 变异实测出来的 —— 我第一版注释把因果写在了 flag 上,
+// 换成 ParseComments 之后守卫照绿(单道变异不变红只说明"有别的东西兜着"),
+// 换成字节切片才红。要判某道是否必要,看的是【只留它】时成不成立。
+func clFuncBodySource(t *testing.T, file, fn string) string {
+	t.Helper()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, file, nil, 0) // 无 ParseComments
+	if err != nil {
+		t.Fatalf("解析 %s: %v", file, err)
+	}
+	for _, d := range f.Decls {
+		fd, ok := d.(*ast.FuncDecl)
+		if !ok || fd.Name.Name != fn || fd.Body == nil {
+			continue
+		}
+		var sb strings.Builder
+		if err := printer.Fprint(&sb, fset, fd.Body); err != nil {
+			t.Fatalf("重打 %s 的函数体: %v", fn, err)
+		}
+		return sb.String()
+	}
+	return ""
+}
+
+// 判据自证:注释里写着断言要找的字符串时,必须【仍然】判为缺失。
+// 这一条直接钉住上面那个「不带 ParseComments」的决定 —— 换成带注释解析就会红。
+func TestClFuncBodySourceStripsComments(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake.go")
+	src := "package fake\n\nfunc Victim() {\n" +
+		"\t// 这里本该有 LastUpdate.Load() == 0 的兜底,但其实没写\n" +
+		"\tprintln(1)\n}\n"
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatalf("写合成反例: %v", err)
+	}
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	body := clFuncBodySource(t, "fake.go", "Victim")
+	if body == "" {
+		t.Fatal("合成反例里没提到函数体 —— helper 失效")
+	}
+	if strings.Contains(body, "LastUpdate.Load() == 0") {
+		t.Fatal("函数体里带上了注释内容 —— 判据会被「关于代码的话」满足," +
+			"上面那条 CheckChanges 守卫的绿是假的")
+	}
 }
