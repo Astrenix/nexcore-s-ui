@@ -291,6 +291,18 @@ func (s *SettingService) GetPort() (int, error) {
 	return s.getInt("webPort")
 }
 
+// SetNodeName 设置节点名称。
+//
+// 🩸 它不只是「侧边栏显示」—— 它是**分享链接 remark 的前缀**
+// (见 client.go remarkPrefixFor:直连模式 = nodeName,空则 LinkGenerator
+// 回退成 inbound.Tag)。没配的话用户在客户端里看到的线路名会是
+// "nx-vless-reality-xxx" 这种内部 tag,而不是「东京 PCCW」这种可读名字。
+//
+// 允许置空:空 = 回到 tag 兜底,是一个合法状态,不是错误。
+func (s *SettingService) SetNodeName(name string) error {
+	return s.setString("nodeName", strings.TrimSpace(name))
+}
+
 func (s *SettingService) SetPort(port int) error {
 	return s.setInt("webPort", port)
 }

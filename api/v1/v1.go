@@ -641,9 +641,15 @@ func (a *Controller) getSettings(c *gin.Context) {
 // patchSettings 接受 partial JSON,只设置非空字段。与 x-ui 同语义。
 // 字段:port / path。
 func (a *Controller) patchSettings(c *gin.Context) {
+	// 🩸 这个结构体就是本端点的【契约】—— ShouldBindJSON 会把结构体里没有的字段
+	// 静默丢弃,然后照样回 200。主控的 SyncNodeNameToNode 发的正是
+	// {"nodeName": "..."},在 nodeName 缺席的那段时间里它【从来没生效过】,
+	// 而主控日志一直打印「节点名已同步到节点 panel」——谎报成功比不报更糟。
+	// 加新字段时:主控发什么,这里就必须收什么,否则就是同一个坑。
 	type body struct {
-		Port *int    `json:"port"`
-		Path *string `json:"path"`
+		Port     *int    `json:"port"`
+		Path     *string `json:"path"`
+		NodeName *string `json:"nodeName"`
 	}
 	var b body
 	if err := c.ShouldBindJSON(&b); err != nil {
@@ -658,6 +664,14 @@ func (a *Controller) patchSettings(c *gin.Context) {
 	}
 	if b.Path != nil && *b.Path != "" {
 		if err := a.settingSvc.SetWebPath(*b.Path); err != nil {
+			BadRequest(c, "update_failed", err.Error())
+			return
+		}
+	}
+	// nodeName 允许显式置空(""),所以只判 nil 不判空串 —— 与 Port/Path
+	// 那两个「空值无意义」的字段语义不同:空 nodeName = 回到 inbound.Tag 兜底。
+	if b.NodeName != nil {
+		if err := a.settingSvc.SetNodeName(*b.NodeName); err != nil {
 			BadRequest(c, "update_failed", err.Error())
 			return
 		}
