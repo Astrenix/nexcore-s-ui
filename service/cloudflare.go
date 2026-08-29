@@ -268,6 +268,12 @@ func (s *CloudflareService) RandomSubdomain(prefix string) string {
 	return strings.TrimSpace(prefix) + "-" + tail
 }
 
+// acmeSharedALPN 是 ACME 共享 TLS 记录对外声明的 ALPN 集合。
+//
+// 提成包级变量,是为了让守卫用例能【直接读到它】—— 把清单在测试里抄一遍的写法,
+// 在实现被改坏时照样是绿的(自证必须调用,不能复述)。
+var acmeSharedALPN = []string{"h3", "h2", "http/1.1"}
+
 // IssueTLS 不真签证书 — sing-box 自己内置 ACME(with_acme build tag),
 // 只要把 acme 块写入 model.Tls.Server,sing-box 启动时会用 dns01_challenge
 // 走 Cloudflare 取证书。这里我们只负责落库一条 model.Tls 记录,把 cf
@@ -313,8 +319,23 @@ func (s *CloudflareService) IssueTLS(name, fqdn, email, cfToken, dataDir string)
 	}
 
 	server := map[string]interface{}{
-		"enabled":     true,
-		"alpn":        []string{"h2", "http/1.1"},
+		"enabled": true,
+		// 🩸 h3 必须在列(2026-08-29 实测):这份 TLS 记录是**一证多入站共用**的
+		// (ensureACMETLS 建一次,provision 把它挂给所有 needs_cert 的入站),
+		// 而 ALPN 是**按传输层**分的 —— hysteria2 / tuic 走 QUIC,客户端只发 h3;
+		// vless-ws-tls 这类 TCP+TLS 只发 h2 / http/1.1。
+		// 少了 h3,QUIC 入站在握手阶段就被服务端拒掉:
+		//   CRYPTO_ERROR 0x178 (remote): tls: no application protocol
+		// (0x178 = TLS alert 120 no_application_protocol)。
+		//
+		// 表现极具迷惑性:入站正常监听、面板显示一切正常、分享链接也生成得出来,
+		// **只有真的连一次才知道它从来没通过**。首台带 hysteria2 的节点
+		//(usisp1,2026-08-29)开出来就是死的,而此前 7 台老节点全是 TCP 系协议,
+		// 所以这个缺陷潜伏了很久没人碰到。
+		//
+		// 服务端 ALPN 是「我接受哪些」的集合,多列一个不影响任何一方:
+		// TCP 客户端不会提议 h3,QUIC 客户端也不会提议 h2。
+		"alpn":        append([]string(nil), acmeSharedALPN...),
 		"min_version": "1.3", // 抗主动探测/降版本指纹,2026 没有客户端只能 1.2
 		"acme":        acme,
 	}
