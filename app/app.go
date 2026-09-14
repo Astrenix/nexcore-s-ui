@@ -9,6 +9,7 @@ import (
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/service"
+	"github.com/alireza0/s-ui/util"
 	"github.com/alireza0/s-ui/web"
 
 	"github.com/op/go-logging"
@@ -31,6 +32,16 @@ func (a *APP) Init() error {
 	log.Printf("%v %v", config.GetName(), config.GetVersion())
 
 	a.initLog()
+
+	// 按本机内存设 Go 软内存上限。节点常是 1 核 1G 的小机器,不设上限时
+	// 堆涨到哪算哪,最后由内核 OOM killer 决定 —— 表现是周期性掉线而日志
+	// 里什么都没有(被 SIGKILL 的进程写不出遗言)。放在 initLog 之后是为了
+	// 这条结论能进日志;放在 InitDB 之前是因为 sqlite 一开就开始占内存。
+	if limit, src := util.ConfigureMemoryLimit(); limit > 0 {
+		logger.Info("Go 内存软上限已设为 ", limit>>20, " MiB(依据:", src, ")")
+	} else if src != "" {
+		logger.Debug("未设置 Go 内存软上限:", src)
+	}
 
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
