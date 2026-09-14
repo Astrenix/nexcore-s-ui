@@ -121,6 +121,12 @@
               <el-form-item :label="`${$t('setting.trafficAge')} (${$t('date.d')})`">
                 <el-input-number v-model="trafficAge" :min="0" controls-position="right" style="width: 100%" />
               </el-form-item>
+              <el-form-item :label="`${$t('setting.apiLogAge')} (${$t('date.d')})`">
+                <el-input-number v-model="apiLogAge" :min="0" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item :label="`${$t('setting.changesAge')} (${$t('date.d')})`">
+                <el-input-number v-model="changesAge" :min="0" controls-position="right" style="width: 100%" />
+              </el-form-item>
               <el-form-item :label="$t('setting.timeLoc')">
                 <el-input v-model="settings.timeLocation" />
               </el-form-item>
@@ -436,7 +442,12 @@ const settings = ref<any>({
   webPath: '/app/',
   webURI: '',
   sessionMaxAge: '0',
-  trafficAge: '30',
+  // 与后端 service/setting.go 的 defaultValueMap 保持一致。两处是各自独立的
+  // 清单,后端改了这里不改的话,一旦 loadData 没覆盖上(接口失败/字段缺失),
+  // 保存时就会把旧默认值写回去,把迁移做的事悄悄撤销。
+  trafficAge: '7',
+  apiLogAge: '7',
+  changesAge: '30',
   timeLocation: 'Asia/Tehran',
   nodeName: '',
   linkAddrSource: 'panel',
@@ -576,6 +587,16 @@ const sessionMaxAge = computed({
 const trafficAge = computed({
   get: () => (settings.value.trafficAge.length > 0 ? parseInt(settings.value.trafficAge) : 0),
   set: (v: number) => { settings.value.trafficAge = v > 0 ? v.toString() : '0' },
+})
+
+const apiLogAge = computed({
+  get: () => (settings.value.apiLogAge?.length > 0 ? parseInt(settings.value.apiLogAge) : 0),
+  set: (v: number) => { settings.value.apiLogAge = v > 0 ? v.toString() : '0' },
+})
+
+const changesAge = computed({
+  get: () => (settings.value.changesAge?.length > 0 ? parseInt(settings.value.changesAge) : 0),
+  set: (v: number) => { settings.value.changesAge = v > 0 ? v.toString() : '0' },
 })
 
 const stateChange = computed(() => !FindDiff.deepCompare(settings.value, oldSettings.value))

@@ -54,7 +54,21 @@ var defaultValueMap = map[string]string{
 	"webPath":       "/app/",
 	"webURI":        "",
 	"sessionMaxAge": "0",
-	"trafficAge":    "30",
+	// trafficAge:stats 流量明细的保留天数(DelStatsJob @daily 按它删)。
+	// 30 → 7:节点本地的 stats 明细只喂面板图表 —— 计费走 clients.up/down
+	// 累计列(主控读 /inbounds/:id/client-traffics,那条 SQL 只 SELECT clients),
+	// 历史归档在主控的 proxy_host_traffic_dailies 按天存着。本地留 30 天
+	// 纯属重复存储:实测一台 14 用户的节点 stats 就有 225 万行 / 162MB。
+	// 0 表示关闭流量统计(既有语义,不要改)。
+	"trafficAge":    "7",
+	// apiLogAge:api_logs 保留天数。此前【没有任何自动清理】——
+	// ApiLogService.PruneOlderThan 早就写好且注释写着"后台 cron 用",
+	// 但全仓零调用方,于是只涨不减(实测 50171 行)。
+	"apiLogAge":     "7",
+	// changesAge:changes 变更审计的保留天数。它同时是前端增量刷新的判据
+	// (CheckChanges 比 date_time > lu),删旧行只会让"没变化"更早成立,安全。
+	// 审计价值比流量明细高,给的窗口也长一些。
+	"changesAge":    "30",
 	"timeLocation":  "UTC",
 	"config":        defaultConfig,
 	"version":       config.GetVersion(),
@@ -356,6 +370,16 @@ func (s *SettingService) GetSessionMaxAge() (int, error) {
 
 func (s *SettingService) GetTrafficAge() (int, error) {
 	return s.getInt("trafficAge")
+}
+
+// GetApiLogAge 返回 api_logs 的保留天数。<=0 视为"不清理"。
+func (s *SettingService) GetApiLogAge() (int, error) {
+	return s.getInt("apiLogAge")
+}
+
+// GetChangesAge 返回 changes 变更审计的保留天数。<=0 视为"不清理"。
+func (s *SettingService) GetChangesAge() (int, error) {
+	return s.getInt("changesAge")
 }
 
 func (s *SettingService) GetTimeLocation() (*time.Location, error) {

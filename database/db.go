@@ -98,7 +98,11 @@ func OpenDB(dbPath string) error {
 	// locked,立刻再点就 OK"(SaveStats cron 每 10s 写一次撞了 Save tx 升级)。
 	// _busy_timeout=30000:Save 路径包含 corePtr.AddInbound,sing-box 复杂入站
 	// reload 3-8s,叠加 SaveStats 撞窗口需要更充分缓冲,30s 兜底。
-	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate&_foreign_keys=on"
+	// _auto_vacuum=incremental:让【新建】的库一出生就能增量归还空闲页。
+	// 对已存在的库这个参数不起作用(SQLite 只在建库那一刻定模式),存量库由
+	// VacuumJob 首次运行时用一次全量 VACUUM 切过来 —— 放在 cron 而非这里,
+	// 是因为几十秒的重建卡在启动路径上会让主控探活把节点判成 offline。
+	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate&_foreign_keys=on&_auto_vacuum=incremental"
 	db, err = gorm.Open(sqlite.Open(dsn), c)
 	if err != nil {
 		return err
@@ -177,6 +181,18 @@ func InitDB(dbPath string) error {
 		return err
 	}
 
+	// 一次性迁移:把继承自旧默认值的 trafficAge=30 降到 7。
+	//
+	// 🩸 为什么非要迁移不可:defaultValueMap 的语义是「key 已存在就跳过、不覆盖」
+	// (setting.go 的 GetAllSetting 循环),所以改那张表里的数字【只影响新装机器】。
+	// 存量节点的 settings 表里早就写着 30,不迁移的话这次改动对它们一个字节都不生效。
+	//
+	// 只动恰好等于旧默认值 30 的那些:分不清"用户主动选了 30"和"继承的旧默认",
+	// 但改成别的值(14 / 60 / 0)一定是人为配置过,那是明确意图,不能覆盖。
+	if err := migrateDefaultTrafficAge(db); err != nil {
+		return err
+	}
+
 	err = initUser()
 	if err != nil {
 		return err
@@ -231,4 +247,23 @@ func GetDB() *gorm.DB {
 
 func IsNotFound(err error) bool {
 	return err == gorm.ErrRecordNotFound
+}
+
+// migrateDefaultTrafficAge 把仍停留在旧默认值 30 的 trafficAge 降到 7。
+//
+// 幂等:第二次执行时库里已是 7,WHERE value='30' 匹配不到,RowsAffected=0。
+// 只在真的改动了行时记日志,避免每次启动都刷一条。
+func migrateDefaultTrafficAge(db *gorm.DB) error {
+	const legacyDefault = "30"
+	const newDefault = "7"
+	res := db.Model(&model.Setting{}).
+		Where("key = ? AND value = ?", "trafficAge", legacyDefault).
+		Update("value", newDefault)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected > 0 {
+		fmt.Fprintln(os.Stderr, "[migrate] trafficAge 30 → 7 天(stats 明细只喂本机图表;计费与历史归档在主控侧)")
+	}
+	return nil
 }

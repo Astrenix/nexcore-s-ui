@@ -87,6 +87,14 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 		if trafficAge > 0 {
 			c.cron.AddJob("@daily", NewDelStatsJob(trafficAge))
 		}
+		// 清理 api_logs / changes 两张只涨不减的日志表。
+		// 刻意【不】用 @daily:那样会和上面的 DelStatsJob 撞在同一秒,
+		// 而节点常是 1 核机器,两个删除事务叠加会顶着 sqlite 写锁互等
+		// (busy_timeout 30s 兜得住但没必要)。错到 00:30 各跑各的。
+		// 保留天数由作业自己现读设置,所以这里无条件注册。
+		c.cron.AddJob("0 30 0 * * *", NewDelLogsJob())
+		// 回收删除留下的空闲页。放在两个清理作业之后(01:00),否则没东西可收。
+		c.cron.AddJob("0 0 1 * * *", NewVacuumJob())
 		// Start core if it is not running
 		c.cron.AddJob("@every 5s", NewCheckCoreJob())
 		// database WAL checkpoint

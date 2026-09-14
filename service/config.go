@@ -381,6 +381,21 @@ func (s *ConfigService) GetChanges(actor string, chngKey string, count string) [
 	return chngs
 }
 
+// DelOldChanges 删除 days 天之前的变更审计行。days <= 0 时不做任何事 ——
+// 与 trafficAge 的"0=关闭"语义保持一致,避免把"没配"解读成"全删"。
+//
+// 安全性:changes 除了给面板看历史,还是前端增量刷新的判据
+// (CheckChanges 比 `date_time > lu`)。删旧行只会让"没变化"更早成立,
+// 不会凭空造出"有变化",所以对增量协议是安全方向。
+func (s *ConfigService) DelOldChanges(days int) error {
+	if days <= 0 {
+		return nil
+	}
+	oldTime := time.Now().AddDate(0, 0, -days).Unix()
+	db := database.GetDB()
+	return db.Where("date_time < ?", oldTime).Delete(model.Changes{}).Error
+}
+
 // injectBlockRules 把 model.BlockRule 表里 enable=true 的行翻译成 sing-box
 // route.rule(action=reject),prepend 到 route.rules 数组最前面。
 //

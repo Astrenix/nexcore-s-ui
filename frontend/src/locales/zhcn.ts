@@ -322,6 +322,8 @@ export default {
     webUri: "面板 URI",
     sessionAge: "会话超时时限",
     trafficAge: "流量过期时限",
+    apiLogAge: "API 日志保留",
+    changesAge: "变更记录保留",
     timeLoc: "时区",
     path: "默认路径",
     update: "自动更新时间",

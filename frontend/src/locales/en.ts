@@ -322,6 +322,8 @@ export default {
     webUri: "Panel URI",
     sessionAge: "Session Maximum Age",
     trafficAge: "Traffic Maximum Age",
+    apiLogAge: "API Log Retention",
+    changesAge: "Change Log Retention",
     timeLoc: "Timezone Location",
     path: "Default Path",
     update: "Automatic Update Time",
