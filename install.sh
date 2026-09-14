@@ -398,6 +398,14 @@ LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 
+# 内存兜底(1 核 1G 的小节点是常态)。两层配合:
+#   GOMEMLIMIT  程序启动时按本机内存自算(约 60%),软限 —— 接近时更积极 GC
+#   MemoryMax   systemd 硬限(85%),真的失控才 kill,配合上面的 Restart 自愈
+# 硬限必须【高于】软限,否则 Go 还没来得及 GC 就被杀,等于白设。
+# 刻意不设 MemorySwapMax:小内存机器上 swap 是救命的,禁掉反而更早 OOM。
+MemoryAccounting=true
+MemoryMax=85%
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -525,6 +533,95 @@ setup_first_run() {
     fi
 }
 
+# ── 磁盘占用防护 ────────────────────────────────────────────────────────
+#
+# 节点常配 10G 小盘,而 systemd-journald 默认【没有上限】——
+# 生产实测一台跑了 93 天的节点,journal 吃掉 1.9G,占 20G 盘的 10%;
+# 换成 10G 盘就是 19%,而且还在涨。
+#
+# 用 drop-in 而不是改 /etc/systemd/journald.conf:
+#   - 发行版升级不会打架,用户想撤掉删一个文件就行
+#   - 主配置里用户自己写的值仍然可见,便于排查
+#
+# 幂等 & 不越权:检测到用户已经自己配过 SystemMaxUse 就原样不动 ——
+# 那是明确意图,装个面板不该去改它。
+harden_journald() {
+    local dropin_dir="/etc/systemd/journald.conf.d"
+    local dropin="${dropin_dir}/10-${SERVICE_NAME}.conf"
+
+    if [[ ! -d /run/systemd/system ]]; then
+        return 0
+    fi
+
+    # 用户(或别的 drop-in)已经设过就不插手。排除注释行。
+    if grep -rqsE '^[[:space:]]*SystemMaxUse=' /etc/systemd/journald.conf "${dropin_dir}" 2>/dev/null; then
+        if [[ ! -f "${dropin}" ]]; then
+            step "检测到已有 journald 容量配置,跳过(不覆盖你的设置)"
+            return 0
+        fi
+    fi
+
+    step "限制 systemd journal 容量(默认无上限,小盘上会吃掉几个 G)…"
+    mkdir -p "${dropin_dir}"
+    cat > "${dropin}" <<'JEOF'
+# 由 nexcore-s-ui 安装脚本写入。删掉本文件即可恢复系统默认(无上限)。
+#
+# 100M 对排障足够:节点的关键日志是启动失败、证书续签、core 崩溃,
+# 这些都是低频事件。真要翻更久以前的,用 journalctl --since 之前先
+# 把这个值调大再 systemctl restart systemd-journald。
+[Journal]
+SystemMaxUse=100M
+SystemMaxFileSize=20M
+RuntimeMaxUse=32M
+JEOF
+
+    systemctl restart systemd-journald 2>/dev/null || true
+    # 立即回收超出新上限的历史 journal,否则要等下一次轮转
+    journalctl --vacuum-size=100M >/dev/null 2>&1 || true
+    ok "journal 上限已设为 100M"
+}
+
+# 安装完扫一眼磁盘占用大户,超阈值就提示 —— 只报告不动手。
+#
+# 这些目录属于系统范畴(snapd / apt 缓存 / 运维自己放的备份),装个面板就去
+# 删用户的东西是越界的;但不说一声又会让人在 10G 小盘上莫名其妙地满。
+#
+# 数字来自生产实测(tw1,20G 盘用了 9.8G):
+#   snapd 全家 2.7G(/snap 2.0G + /var/lib/snapd 731M),装的是
+#              core20/core22/lxd/snapd —— Ubuntu 默认塞的,节点一个都用不到
+#   /var/log   2.4G(journal 占 1.9G —— 这条已由 harden_journald 兜住)
+#   /root      405M(历史 db/二进制备份,人工运维留下的)
+#   /var/cache 253M(apt 列表与包缓存)
+report_disk_hogs() {
+    local root_avail_mb
+    root_avail_mb=$(df -Pm / 2>/dev/null | awk 'NR==2{print $4}')
+    [[ -z "${root_avail_mb}" ]] && return 0
+    # 盘还很宽裕就不啰嗦
+    if (( root_avail_mb > 5000 )); then
+        return 0
+    fi
+
+    warn "根分区可用空间仅剩 ${root_avail_mb}MB。以下是常见占用大户(仅提示,脚本不会动它们):"
+
+    local d sz
+    for d in /snap /var/lib/snapd /var/log /var/cache /root; do
+        [[ -e "${d}" ]] || continue
+        sz=$(du -sh "${d}" 2>/dev/null | cut -f1)
+        [[ -n "${sz}" ]] && printf '    %-18s %s\n' "${d}" "${sz}"
+    done
+
+    echo
+    echo "  可考虑的清理(按收益排序,请自行确认后执行):"
+    if command -v snap >/dev/null 2>&1; then
+        echo "    snapd 全家约 2-3G,节点服务器通常用不到:"
+        echo "      systemctl disable --now snapd.service snapd.socket && apt-get purge -y snapd"
+    fi
+    if [[ -d /var/cache/apt ]]; then
+        echo "    apt 缓存:  apt-get clean"
+    fi
+    echo "    历史备份:  检查 /root 下的 *.db / sui.bak-* 是否还需要保留"
+}
+
 wait_for_active() {
     local max="${1:-30}"
     for i in $(seq 1 "${max}"); do
@@ -605,6 +702,9 @@ if [[ -n "${REPORT_URL_RAW}" && -n "${REPORT_KEY_RAW}" ]]; then
     fi
 fi
 
+# 在启动服务之前收紧 journal 上限 —— 服务一起来就开始写日志了
+harden_journald
+
 step "启动服务"
 systemctl restart "${SERVICE_NAME}"
 
@@ -617,6 +717,8 @@ fi
 ok "服务已激活"
 
 show_credentials
+
+report_disk_hogs
 
 # REPORT_KEY 走 CLI 是不安全的(进 /proc/<pid>/cmdline → ps 可见),
 # arg-parse 阶段还没 warn() 可调,这里补告警。fallback 仍接受,只是提醒

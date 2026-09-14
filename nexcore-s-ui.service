@@ -38,5 +38,13 @@ LockPersonality=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 
+# 内存兜底(1 核 1G 的小节点是常态)。两层配合:
+#   GOMEMLIMIT  程序启动时按本机内存自算(约 60%),软限 —— 接近时更积极 GC
+#   MemoryMax   systemd 硬限(85%),真的失控才 kill,配合上面的 Restart 自愈
+# 硬限必须【高于】软限,否则 Go 还没来得及 GC 就被杀,等于白设。
+# 刻意不设 MemorySwapMax:小内存机器上 swap 是救命的,禁掉反而更早 OOM。
+MemoryAccounting=true
+MemoryMax=85%
+
 [Install]
 WantedBy=multi-user.target

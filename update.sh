@@ -100,6 +100,32 @@ SUM_URL="https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/${TARGET}/c
 TMP=$(mktemp -d -t nexcore-s-ui-update.XXXXXX)
 trap 'rm -rf "${TMP}"' EXIT
 
+# ── 磁盘空间预检 ──────────────────────────────────────────────────────
+#
+# 🩸 没有这一步的话,盘满时升级会【中途】失败,而最糟的失败点是
+# `install -m 0755 ... sui` 写到一半 —— 二进制损坏、服务起不来,
+# 比"没升级成功"严重得多。宁可在动任何文件之前就拒绝。
+#
+# 需要多少:tarball ~30M + 解压 ~85M(TMP 侧),安装目录侧还要容纳
+# 新二进制 85M + 备份当前二进制 85M。各留一倍余量。
+require_space() {
+    local path="$1" need_mb="$2" what="$3" avail
+    avail=$(df -Pm "${path}" 2>/dev/null | awk 'NR==2{print $4}')
+    if [[ -z "${avail}" ]]; then
+        return 0   # 探不到就不拦,别让预检本身变成升级的阻碍
+    fi
+    if (( avail < need_mb )); then
+        echo -e "${red}磁盘空间不足${plain}:${what}(${path})仅剩 ${avail}MB,至少需要 ${need_mb}MB" >&2
+        echo -e "  腾空间的常见办法:" >&2
+        echo -e "    apt-get clean                     # apt 缓存" >&2
+        echo -e "    journalctl --vacuum-size=100M     # 系统日志" >&2
+        echo -e "    ls -lh ${INSTALL_DIR}/sui.bak.*   # 历史备份(本脚本也会自动轮转)" >&2
+        exit 1
+    fi
+}
+require_space "${TMP}" 250 "临时目录"
+require_space "${INSTALL_DIR}" 250 "安装目录"
+
 echo -e "${green}下载:${plain} ${URL}"
 if ! curl -fSL --connect-timeout 10 -o "${TMP}/pkg.tar.gz" "${URL}"; then
     echo -e "${red}下载失败,请检查 release ${TARGET} 是否存在${plain}" >&2
@@ -137,6 +163,46 @@ tar -xzf "${TMP}/pkg.tar.gz" -C "${TMP}/"
 echo -e "${green}停止服务…${plain}"
 systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
 
+# 备份当前二进制以便回滚,并轮转掉更老的。
+#
+# 🩸 生产实测(tw1,2026-09-14):安装目录里堆着 3 个历史 sui.bak,合计 246M
+# —— 比二进制本身(85M)还多,而且【没有任何清理机制】,升一次积一个。
+# 节点常配 10G 盘,这是 2.5% 且只增不减。
+#
+# 保留 1 个:回滚只需要"上一版",再老的版本回过去也对不上当前 DB schema
+# (migrate 是单向的)。要回更早的版本应该重装指定 tag,而不是靠这里的堆积。
+BACKUP_KEEP=1
+if [[ -f "${INSTALL_DIR}/sui" ]]; then
+    cp -a "${INSTALL_DIR}/sui" "${INSTALL_DIR}/sui.bak.$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+fi
+# 轮转:按时间倒序留最新的 keep 个,其余删掉。
+#
+# 用 mtime(ls -t)而不是按文件名排序 —— 历史遗留的备份有两种命名格式
+# (sui.bak.20260510-172744-pre1717 与 sui.bak.1778434600-pre1718),
+# 按名字排会把 unix 时间戳那种排错位置。
+#
+# 🩸 文件名由【调用点】用 glob 展开后当参数传进来,函数内不做 glob。
+# 早先的写法是把 "dir/sui.bak.*" 当字符串传进来再靠 `ls -t ${pattern}`
+# 的隐式展开 —— 那依赖"未加引号的变量会被 word-split + glob",而这是
+# bash 特有的行为(zsh 默认不这么做,`set -f` 也会关掉它)。一旦失效,
+# 表现是【一个文件都不删且不报错】,没有任何迹象。
+prune_old_backups() {
+    local keep="$1"; shift
+    local files=() f n=0
+    for f in "$@"; do
+        [[ -f "$f" ]] && files+=("$f")   # glob 没匹配到时传进来的是字面量,在这里被滤掉
+    done
+    (( ${#files[@]} <= keep )) && return 0
+    while IFS= read -r f; do
+        n=$((n + 1))
+        if (( n > keep )); then
+            rm -f "$f" && echo -e "  清理旧备份 $(basename "$f")"
+        fi
+    done < <(ls -t "${files[@]}" 2>/dev/null)
+}
+prune_old_backups "${BACKUP_KEEP}" "${INSTALL_DIR}"/sui.bak.*
+prune_old_backups 3 "${SERVICE_FILE}".bak.*
+
 echo -e "${green}替换二进制 + 脚本…${plain}"
 install -m 0755 "${TMP}/${PKG_PREFIX}/sui" "${INSTALL_DIR}/sui"
 if [[ -f "${TMP}/${PKG_PREFIX}/${CMD_NAME}.sh" ]]; then
@@ -163,6 +229,33 @@ if [[ -n "${NEW_UNIT}" ]] && ! diff -q "${NEW_UNIT}" "${SERVICE_FILE}" >/dev/nul
     install -m 0644 "${NEW_UNIT}" "${SERVICE_FILE}"
     systemctl daemon-reload
     systemctl reset-failed "${SERVICE_NAME}" 2>/dev/null || true
+fi
+
+# ---------- journal 容量上限 ----------
+#
+# systemd-journald 默认【没有上限】。生产实测一台跑了 93 天的节点,journal
+# 吃掉 1.9G —— 节点常配 10G 小盘,这是近 20%。
+#
+# ⚠️ 本段与 install.sh 的 harden_journald() 是【同一件事的两份实现】:
+# 两个脚本各自独立分发(update.sh 是单独下载执行的),没法 source 共享文件。
+# 改任何一处都要同步另一处,否则新装机器和升级机器的行为会分叉。
+#
+# 幂等:已经有人配过 SystemMaxUse(包括本脚本上次写的)就什么都不做,
+# 避免每次升级都重启一次 journald。
+JOURNALD_DROPIN="/etc/systemd/journald.conf.d/10-${SERVICE_NAME}.conf"
+if [[ -d /run/systemd/system ]] && \
+   ! grep -rqsE '^[[:space:]]*SystemMaxUse=' /etc/systemd/journald.conf /etc/systemd/journald.conf.d 2>/dev/null; then
+    echo -e "${green}限制 systemd journal 容量(默认无上限)…${plain}"
+    mkdir -p "$(dirname "${JOURNALD_DROPIN}")"
+    cat > "${JOURNALD_DROPIN}" <<'JEOF'
+# 由 nexcore-s-ui 升级脚本写入。删掉本文件即可恢复系统默认(无上限)。
+[Journal]
+SystemMaxUse=100M
+SystemMaxFileSize=20M
+RuntimeMaxUse=32M
+JEOF
+    systemctl restart systemd-journald 2>/dev/null || true
+    journalctl --vacuum-size=100M >/dev/null 2>&1 || true
 fi
 
 # ---------- migrate (跨版本 schema 演进) ----------
