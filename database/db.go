@@ -102,7 +102,13 @@ func OpenDB(dbPath string) error {
 	// 对已存在的库这个参数不起作用(SQLite 只在建库那一刻定模式),存量库由
 	// VacuumJob 首次运行时用一次全量 VACUUM 切过来 —— 放在 cron 而非这里,
 	// 是因为几十秒的重建卡在启动路径上会让主控探活把节点判成 offline。
-	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate&_foreign_keys=on&_auto_vacuum=incremental"
+	// _cache_size=-1000:每连接页缓存 1MB(负数=KiB,SQLite 默认 -2000 即 2MB)。
+	// 🩸 这块内存在 **C 侧**,util/memlimit.go 的 GOMEMLIMIT 完全管不到它 ——
+	// 在 1G/512M 的小节点上,它恰恰是最危险的那部分:Go 侧被软上限压着,
+	// 而 sqlite 页缓存照涨,最后被 OOM killer 挑中的仍然是本进程。
+	// 节点的查询模式是「小表高频(clients/inbounds)+ 大表只写不读(stats/api_logs)」,
+	// 1MB 页缓存足够覆盖热表;真正的大表本来就不靠缓存。
+	dsn := dbPath + sep + "_busy_timeout=30000&_journal_mode=WAL&_txlock=immediate&_foreign_keys=on&_auto_vacuum=incremental&_cache_size=-1000"
 	db, err = gorm.Open(sqlite.Open(dsn), c)
 	if err != nil {
 		return err
@@ -112,8 +118,15 @@ func OpenDB(dbPath string) error {
 	if err != nil {
 		return err
 	}
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(5)
+	// 25 → 8(2026-09-15)。SQLite 在 WAL 下是「多读单写」,而本进程的写还被
+	// subOpsMu 与 sqlite 写锁进一步串行化 —— 25 条并发连接对它没有任何意义,
+	// 只是把「页缓存上限 × 连接数」这个乘数拉大。
+	// 节点的真实负载是主控每 60 秒一次探活 + 每 5 分钟一轮调度,8 条绰绰有余;
+	// 上限从 25×1MB 降到 8×1MB,最坏情况下的 C 侧常驻从约 50MB 压到约 8MB。
+	// ⚠️ 不要再调小到个位数以下:留出余量给「探活 + 调度 + 人工请求」撞在一起的瞬间,
+	// 连接不够时 database/sql 会排队等待,表现为 API 偶发变慢而不是报错,很难排查。
+	sqlDB.SetMaxOpenConns(8)
+	sqlDB.SetMaxIdleConns(2)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	if config.IsDebug() {
