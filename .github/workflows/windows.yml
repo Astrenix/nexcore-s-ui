@@ -6,16 +6,9 @@ on:
     types: [published]
   # 故意去掉 `push: tags` —— release published 已经会触发,再听 tag push 会
   # 让相同 commit 跑两遍,第二遍上传同名 asset 时撞 422 "already_exists"。
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/windows.yml'
-      - 'frontend/**'
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'windows/**'
+  # 2026-10-02 去掉 push 触发:节点的安装/更新只从 GitHub Release 下载(install.sh / update.sh),
+  # push 到 main 时的全量构建产物没有任何消费者,却每次占约 300 MB Actions 存储(配额 0.5 GB)。
+  # 构建是否能编过由 test.yml(每次 push 都跑 go test)把关;要临时出包用 workflow_dispatch。
 
 concurrency:
   group: windows-${{ github.ref }}
@@ -131,7 +124,7 @@ jobs:
         with:
           name: nexcore-s-ui-windows-${{ matrix.arch }}
           path: ./nexcore-s-ui-windows-${{ matrix.arch }}.zip
-          retention-days: 30
+          retention-days: 1  # 只在同一次运行的 job 间传递;正式包在 Release 里
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2

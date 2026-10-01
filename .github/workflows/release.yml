@@ -7,17 +7,9 @@ on:
   # 故意去掉 `push: tags` —— `gh release create` 后的 release published
   # 事件已经会触发本 workflow,如果再额外听 tag push 会让相同的 commit 跑
   # 两遍,第二遍上传同名 asset 时撞 422 "already_exists"。
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/release.yml'
-      - 'frontend/**'
-      - '**.sh'
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'nexcore-s-ui.service'
+  # 2026-10-02 去掉 push 触发:节点的安装/更新只从 GitHub Release 下载(install.sh / update.sh),
+  # push 到 main 时的全量构建产物没有任何消费者,却每次占约 300 MB Actions 存储(配额 0.5 GB)。
+  # 构建是否能编过由 test.yml(每次 push 都跑 go test)把关;要临时出包用 workflow_dispatch。
 
 # 同名 ref 上同时只跑一个 release,后来的取消 — 防止手动重跑或 tag/branch
 # 双触发并发上传到同一 release 撞 already_exists。
@@ -66,6 +58,7 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist/
+          retention-days: 1
 
   build-linux:
     name: build-${{ matrix.platform }}
@@ -199,7 +192,7 @@ jobs:
         with:
           name: nexcore-s-ui-linux-${{ matrix.platform }}
           path: ./nexcore-s-ui-linux-${{ matrix.platform }}.tar.gz
-          retention-days: 30
+          retention-days: 1  # 只在同一次运行的 job 间传递;正式包在 Release 里
 
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
